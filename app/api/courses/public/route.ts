@@ -50,9 +50,20 @@ export async function GET() {
       ];
     }
 
+    // Use select instead of include to only fetch needed fields
+    // Use _count instead of including purchases to reduce database operations
     const courses = await db.course.findMany({
       where: whereClause,
-      include: {
+      select: {
+        id: true,
+        userId: true,
+        title: true,
+        description: true,
+        imageUrl: true,
+        price: true,
+        isPublished: true,
+        createdAt: true,
+        updatedAt: true,
         chapters: {
           where: {
             isPublished: true,
@@ -69,12 +80,13 @@ export async function GET() {
             id: true,
           },
         },
-        purchases: {
-          where: {
-            status: "ACTIVE",
-          },
+        _count: {
           select: {
-            id: true,
+            purchases: {
+              where: {
+                status: "ACTIVE",
+              },
+            },
           },
         },
       },
@@ -84,10 +96,20 @@ export async function GET() {
     });
 
     // Return courses with default progress of 0 for public view
-    const coursesWithDefaultProgress = courses.map(({ purchases, ...course }) => ({
-      ...course,
+    const coursesWithDefaultProgress = courses.map((course: typeof courses[0]) => ({
+      id: course.id,
+      userId: course.userId,
+      title: course.title,
+      description: course.description,
+      imageUrl: course.imageUrl,
+      price: course.price,
+      isPublished: course.isPublished,
+      createdAt: course.createdAt,
+      updatedAt: course.updatedAt,
+      chapters: course.chapters,
+      quizzes: course.quizzes,
       progress: 0,
-      enrollmentCount: purchases.length,
+      enrollmentCount: course._count.purchases,
     }));
 
     return NextResponse.json(coursesWithDefaultProgress);
