@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
 
         if (!code || !coursePrice) {
             return new NextResponse(
-                JSON.stringify({ error: "رمز الكوبون وسعر الكورس مطلوبان" }),
+                JSON.stringify({ error: "رمز الكود وسعر الكورس مطلوبان" }),
                 { status: 400, headers: { "Content-Type": "application/json" } }
             );
         }
@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
 
         if (!promocode) {
             return new NextResponse(
-                JSON.stringify({ error: "رمز الكوبون غير صحيح" }),
+                JSON.stringify({ error: "رمز الكود غير صحيح" }),
                 { status: 404, headers: { "Content-Type": "application/json" } }
             );
         }
@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
         // Check if promocode is active
         if (!promocode.isActive) {
             return new NextResponse(
-                JSON.stringify({ error: "هذا الكوبون غير نشط" }),
+                JSON.stringify({ error: "هذا الكود غير نشط" }),
                 { status: 400, headers: { "Content-Type": "application/json" } }
             );
         }
@@ -44,14 +44,14 @@ export async function POST(req: NextRequest) {
         const now = new Date();
         if (promocode.validFrom && new Date(promocode.validFrom) > now) {
             return new NextResponse(
-                JSON.stringify({ error: "هذا الكوبون لم يبدأ بعد" }),
+                JSON.stringify({ error: "هذا الكود لم يبدأ بعد" }),
                 { status: 400, headers: { "Content-Type": "application/json" } }
             );
         }
 
         if (promocode.validUntil && new Date(promocode.validUntil) < now) {
             return new NextResponse(
-                JSON.stringify({ error: "هذا الكوبون منتهي الصلاحية" }),
+                JSON.stringify({ error: "هذا الكود منتهي الصلاحية" }),
                 { status: 400, headers: { "Content-Type": "application/json" } }
             );
         }
@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
         // Check usage limit
         if (promocode.usageLimit && promocode.usedCount >= promocode.usageLimit) {
             return new NextResponse(
-                JSON.stringify({ error: "تم استنفاذ عدد مرات استخدام هذا الكوبون" }),
+                JSON.stringify({ error: "تم استنفاذ عدد مرات استخدام هذا الكود" }),
                 { status: 400, headers: { "Content-Type": "application/json" } }
             );
         }

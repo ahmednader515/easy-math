@@ -242,17 +242,17 @@ model QuizAnswer {
 
 model PromoCode {
     id String @id @default(uuid())
-    code String @unique // رمز الكوبون
+    code String @unique // رمز الكود
     discountType String // "PERCENTAGE" or "FIXED"
     discountValue Float // قيمة الخصم (نسبة أو مبلغ ثابت)
     minPurchase Float? // الحد الأدنى للشراء (اختياري)
     maxDiscount Float? // الحد الأقصى للخصم (للمناسب) (اختياري)
     usageLimit Int? // الحد الأقصى لعدد مرات الاستخدام (اختياري)
     usedCount Int @default(0) // عدد مرات الاستخدام الحالية
-    isActive Boolean @default(true) // هل الكوبون نشط
+    isActive Boolean @default(true) // هل الكود نشط
     validFrom DateTime? // تاريخ بداية الصلاحية (اختياري)
     validUntil DateTime? // تاريخ انتهاء الصلاحية (اختياري)
-    description String? @db.Text // وصف الكوبون (اختياري)
+    description String? @db.Text // وصف الكود (اختياري)
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
 

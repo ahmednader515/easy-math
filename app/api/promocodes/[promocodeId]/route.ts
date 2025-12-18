@@ -93,7 +93,7 @@ export async function PATCH(
 
             if (codeExists) {
                 return new NextResponse(
-                    JSON.stringify({ error: "رمز الكوبون موجود بالفعل" }),
+                    JSON.stringify({ error: "رمز الكود موجود بالفعل" }),
                     { status: 400, headers: { "Content-Type": "application/json" } }
                 );
             }
@@ -176,7 +176,7 @@ export async function DELETE(
             where: { id: resolvedParams.promocodeId },
         });
 
-        return NextResponse.json({ message: "تم حذف الكوبون بنجاح" });
+        return NextResponse.json({ message: "تم حذف الكود بنجاح" });
     } catch (error) {
         console.error("[PROMOCODE_DELETE]", error);
         return new NextResponse("Internal Error", { status: 500 });

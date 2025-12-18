@@ -114,7 +114,7 @@ export async function POST(req: NextRequest) {
 
         if (existingCode) {
             return new NextResponse(
-                JSON.stringify({ error: "رمز الكوبون موجود بالفعل" }),
+                JSON.stringify({ error: "رمز الكود موجود بالفعل" }),
                 { status: 400, headers: { "Content-Type": "application/json" } }
             );
         }

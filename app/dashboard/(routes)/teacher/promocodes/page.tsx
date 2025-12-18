@@ -59,11 +59,11 @@ const TeacherPromoCodesPage = () => {
                 const data = await response.json();
                 setPromocodes(data);
             } else {
-                toast.error("حدث خطأ أثناء جلب الكوبونات");
+                toast.error("حدث خطأ أثناء جلب الاكواد");
             }
         } catch (error) {
             console.error("Error fetching promocodes:", error);
-            toast.error("حدث خطأ أثناء جلب الكوبونات");
+            toast.error("حدث خطأ أثناء جلب الاكواد");
         } finally {
             setLoading(false);
         }
@@ -106,7 +106,7 @@ const TeacherPromoCodesPage = () => {
     const handleSubmit = async () => {
         // Validation
         if (!code.trim()) {
-            toast.error("رمز الكوبون مطلوب");
+            toast.error("رمز الكود مطلوب");
             return;
         }
 
@@ -143,7 +143,7 @@ const TeacherPromoCodesPage = () => {
             });
 
             if (response.ok) {
-                toast.success(editingPromocode ? "تم تحديث الكوبون بنجاح" : "تم إنشاء الكوبون بنجاح");
+                toast.success(editingPromocode ? "تم تحديث الكود بنجاح" : "تم إنشاء الكود بنجاح");
                 setIsDialogOpen(false);
                 resetForm();
                 fetchPromocodes();
@@ -153,12 +153,12 @@ const TeacherPromoCodesPage = () => {
             }
         } catch (error) {
             console.error("Error saving promocode:", error);
-            toast.error("حدث خطأ أثناء حفظ الكوبون");
+            toast.error("حدث خطأ أثناء حفظ الكود");
         }
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm("هل أنت متأكد من حذف هذا الكوبون؟")) {
+        if (!confirm("هل أنت متأكد من حذف هذا الكود؟")) {
             return;
         }
 
@@ -168,14 +168,14 @@ const TeacherPromoCodesPage = () => {
             });
 
             if (response.ok) {
-                toast.success("تم حذف الكوبون بنجاح");
+                toast.success("تم حذف الكود بنجاح");
                 fetchPromocodes();
             } else {
-                toast.error("حدث خطأ أثناء حذف الكوبون");
+                toast.error("حدث خطأ أثناء حذف الكود");
             }
         } catch (error) {
             console.error("Error deleting promocode:", error);
-            toast.error("حدث خطأ أثناء حذف الكوبون");
+            toast.error("حدث خطأ أثناء حذف الكود");
         }
     };
 
@@ -200,17 +200,17 @@ const TeacherPromoCodesPage = () => {
                 </h1>
                 <Button onClick={openCreateDialog} className="bg-[#0083d3] hover:bg-[#0083d3]/90">
                     <Plus className="h-4 w-4 mr-2" />
-                    إنشاء كوبون جديد
+                    إنشاء كود جديد
                 </Button>
             </div>
 
             <Card>
                 <CardHeader>
-                    <CardTitle>قائمة الكوبونات</CardTitle>
+                    <CardTitle>قائمة الاكواد</CardTitle>
                     <div className="flex items-center space-x-2 mt-4">
                         <Search className="h-4 w-4 text-muted-foreground" />
                         <Input
-                            placeholder="البحث برمز الكوبون أو الوصف..."
+                            placeholder="البحث برمز الكود أو الوصف..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             className="max-w-sm"
@@ -285,7 +285,7 @@ const TeacherPromoCodesPage = () => {
                         </Table>
                     ) : (
                         <div className="text-center text-muted-foreground py-8">
-                            {searchTerm ? "لا توجد نتائج" : "لا توجد كوبونات"}
+                            {searchTerm ? "لا توجد نتائج" : "لا توجد كودات"}
                         </div>
                     )}
                 </CardContent>
@@ -296,16 +296,16 @@ const TeacherPromoCodesPage = () => {
                 <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
                         <DialogTitle>
-                            {editingPromocode ? "تعديل الكوبون" : "إنشاء كوبون جديد"}
+                            {editingPromocode ? "تعديل الكود" : "إنشاء كود جديد"}
                         </DialogTitle>
                         <DialogDescription>
-                            {editingPromocode ? "قم بتعديل بيانات الكوبون" : "قم بإنشاء كوبون خصم جديد"}
+                            {editingPromocode ? "قم بتعديل بيانات الكود" : "قم بإنشاء كود خصم جديد"}
                         </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 mt-4">
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
-                                <Label htmlFor="code">رمز الكوبون *</Label>
+                                <Label htmlFor="code">رمز الكود *</Label>
                                 <Input
                                     id="code"
                                     value={code}
@@ -410,7 +410,7 @@ const TeacherPromoCodesPage = () => {
                                 id="description"
                                 value={description}
                                 onChange={(e) => setDescription(e.target.value)}
-                                placeholder="وصف الكوبون (اختياري)"
+                                placeholder="وصف الكود (اختياري)"
                             />
                         </div>
 

@@ -143,7 +143,7 @@ export async function POST(
 
       // Create balance transaction record
       const transactionDescription = appliedPromocode
-        ? `تم شراء الكورس: ${course.title} (كوبون خصم: ${appliedPromocode})`
+        ? `تم شراء الكورس: ${course.title} (كود خصم: ${appliedPromocode})`
         : `تم شراء الكورس: ${course.title}`;
 
       await tx.balanceTransaction.create({

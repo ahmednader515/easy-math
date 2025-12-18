@@ -100,7 +100,7 @@ export default function PurchasePage({
           finalPrice: data.finalPrice,
           originalPrice: data.originalPrice,
         });
-        toast.success("تم تطبيق كوبون الخصم بنجاح!");
+        toast.success("تم تطبيق كود الخصم بنجاح!");
       } else {
         const errorData = await response.json();
         setPromocodeValidation({
@@ -108,13 +108,13 @@ export default function PurchasePage({
           discountAmount: "0.00",
           finalPrice: (course.price || 0).toFixed(2),
           originalPrice: (course.price || 0).toFixed(2),
-          error: errorData.error || "رمز الكوبون غير صحيح",
+          error: errorData.error || "رمز الكود غير صحيح",
         });
-        toast.error(errorData.error || "رمز الكوبون غير صحيح");
+        toast.error(errorData.error || "رمز الكود غير صحيح");
       }
     } catch (error) {
       console.error("Error validating promocode:", error);
-      toast.error("حدث خطأ أثناء التحقق من الكوبون");
+      toast.error("حدث خطأ أثناء التحقق من الكود");
     } finally {
       setIsValidatingPromocode(false);
     }
@@ -253,7 +253,7 @@ export default function PurchasePage({
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Ticket className="h-5 w-5" />
-                كوبون الخصم
+                كود الخصم
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -263,7 +263,7 @@ export default function PurchasePage({
                     <Input
                       value={promocode}
                       onChange={(e) => setPromocode(e.target.value.toUpperCase())}
-                      placeholder="أدخل رمز الكوبون"
+                      placeholder="أدخل رمز الكود"
                       className="flex-1"
                       onKeyPress={(e) => {
                         if (e.key === "Enter") {
