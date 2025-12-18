@@ -10,15 +10,18 @@ export async function GET(
         const resolvedParams = await params;
         const { userId } = await auth();
 
-        // Check if user has purchased the course
+        // Check if user has purchased the course and get course data
         let hasAccess = false;
+        let coursePrice = 0;
+        
         if (userId) {
             const course = await db.course.findUnique({
                 where: {
                     id: resolvedParams.courseId,
                     isPublished: true,
                 },
-                include: {
+                select: {
+                    price: true,
                     purchases: {
                         where: {
                             userId,
@@ -30,54 +33,55 @@ export async function GET(
 
             // Free courses are always accessible, but we still check purchase
             if (course) {
+                coursePrice = course.price;
                 hasAccess = course.price === 0 || course.purchases.length > 0;
             }
         }
 
-        // Get chapters
-        const chapters = await db.chapter.findMany({
-            where: {
-                courseId: resolvedParams.courseId,
-                isPublished: true
-            },
-            include: hasAccess && userId ? {
-                userProgress: {
-                    where: {
-                        userId
-                    },
-                    select: {
-                        isCompleted: true
+        // Fetch chapters and quizzes in parallel
+        const [chapters, quizzes] = await Promise.all([
+            db.chapter.findMany({
+                where: {
+                    courseId: resolvedParams.courseId,
+                    isPublished: true
+                },
+                include: hasAccess && userId ? {
+                    userProgress: {
+                        where: {
+                            userId
+                        },
+                        select: {
+                            isCompleted: true
+                        }
                     }
+                } : undefined,
+                orderBy: {
+                    position: "asc"
                 }
-            } : undefined,
-            orderBy: {
-                position: "asc"
-            }
-        });
-
-        // Get published quizzes
-        const quizzes = await db.quiz.findMany({
-            where: {
-                courseId: resolvedParams.courseId,
-                isPublished: true
-            },
-            include: hasAccess && userId ? {
-                quizResults: {
-                    where: {
-                        studentId: userId
-                    },
-                    select: {
-                        id: true,
-                        score: true,
-                        totalPoints: true,
-                        percentage: true
+            }),
+            db.quiz.findMany({
+                where: {
+                    courseId: resolvedParams.courseId,
+                    isPublished: true
+                },
+                include: hasAccess && userId ? {
+                    quizResults: {
+                        where: {
+                            studentId: userId
+                        },
+                        select: {
+                            id: true,
+                            score: true,
+                            totalPoints: true,
+                            percentage: true
+                        }
                     }
+                } : undefined,
+                orderBy: {
+                    position: "asc"
                 }
-            } : undefined,
-            orderBy: {
-                position: "asc"
-            }
-        });
+            })
+        ]);
 
         // Combine and sort by position
         const allContent = [

@@ -21,6 +21,8 @@ import { cn } from "@/lib/utils";
 import { Course } from "@prisma/client";
 import { Input } from "@/components/ui/input";
 import { formatPrice } from "@/lib/format";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 
 interface PriceFormProps {
     initialData: Course;
@@ -38,8 +40,15 @@ export const PriceForm = ({
 }: PriceFormProps) => {
 
     const [isEditing, setIsEditing] = useState(false);
+    const [isFree, setIsFree] = useState(initialData?.price === 0);
 
-    const toggleEdit = () => setIsEditing((current) => !current);
+    const toggleEdit = () => {
+        setIsEditing((current) => !current);
+        if (!isEditing) {
+            // Reset form when opening edit mode
+            setIsFree(initialData?.price === 0);
+        }
+    };
 
     const router = useRouter();
 
@@ -51,6 +60,14 @@ export const PriceForm = ({
     });
 
     const { isSubmitting, isValid } = form.formState;
+
+    // Update form value when isFree changes
+    const handleFreeToggle = (checked: boolean) => {
+        setIsFree(checked);
+        if (checked) {
+            form.setValue("price", 0);
+        }
+    };
 
     const onSubmit = async (values: z.infer<typeof formSchema>) => {
         try {
@@ -93,6 +110,20 @@ export const PriceForm = ({
             {isEditing && (
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 mt-4">
+                        <div className="flex items-center space-x-2 space-x-reverse mb-4">
+                            <Checkbox
+                                id="isFree"
+                                checked={isFree}
+                                onCheckedChange={handleFreeToggle}
+                                disabled={isSubmitting}
+                            />
+                            <Label
+                                htmlFor="isFree"
+                                className="text-sm font-normal cursor-pointer"
+                            >
+                                الكورس مجاني
+                            </Label>
+                        </div>
                         <FormField 
                             control={form.control}
                             name="price"
@@ -102,9 +133,9 @@ export const PriceForm = ({
                                         <Input 
                                             type="number"
                                             step="0.01"
-                                            disabled={isSubmitting}
+                                            disabled={isSubmitting || isFree}
                                             placeholder="ضع سعر للكورس"
-                                            value={field.value || ''}
+                                            value={isFree ? 0 : (field.value || '')}
                                             onChange={(e) => {
                                                 const value = e.target.value;
                                                 field.onChange(value === '' ? 0 : parseFloat(value));

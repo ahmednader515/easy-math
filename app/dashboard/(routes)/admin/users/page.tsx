@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Search, Edit, Trash2 } from "lucide-react";
 import { format } from "date-fns";
-import { ar } from "date-fns/locale";
+import { ar } from "date-fns/locale/ar";
 import { toast } from "sonner";
 import {
     Dialog,

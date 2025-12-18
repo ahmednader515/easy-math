@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Progress } from "@/components/ui/progress";
 import { Search, Eye, BookOpen, CheckCircle, Clock } from "lucide-react";
 import { format } from "date-fns";
-import { ar } from "date-fns/locale";
+import { ar } from "date-fns/locale/ar";
 
 interface User {
     id: string;

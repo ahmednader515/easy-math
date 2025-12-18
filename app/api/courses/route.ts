@@ -84,7 +84,13 @@ export async function GET(req: Request) {
     const courses = await db.course.findMany({
       where: whereClause,
       include: {
-        user: true,
+        user: {
+          select: {
+            id: true,
+            fullName: true,
+            image: true
+          }
+        },
         chapters: {
           where: {
             isPublished: true,
@@ -110,64 +116,72 @@ export async function GET(req: Request) {
       },
       orderBy: {
         createdAt: "desc",
-      },
+      }
     });
 
     if (includeProgress && userId) {
-      const coursesWithProgress = await Promise.all(
-        courses.map(async (course) => {
-          const totalChapters = course.chapters.length;
-          const totalQuizzes = course.quizzes.length;
-          const totalContent = totalChapters + totalQuizzes;
+      // Batch all progress queries to avoid N+1 problem
+      const allChapterIds = courses.flatMap((course: typeof courses[0]) => course.chapters.map((ch: { id: string }) => ch.id));
+      const allQuizIds = courses.flatMap((course: typeof courses[0]) => course.quizzes.map((q: { id: string }) => q.id));
 
-          let completedChapters = 0;
-          let completedQuizzes = 0;
+      // Single query for all completed chapters
+      const completedChaptersData = allChapterIds.length > 0 ? await db.userProgress.findMany({
+        where: {
+          userId,
+          chapterId: { in: allChapterIds },
+          isCompleted: true
+        },
+        select: {
+          chapterId: true
+        }
+      }) : [];
 
-          if (course.purchases && course.purchases.length > 0) {
-            // Get completed chapters
-            completedChapters = await db.userProgress.count({
-              where: {
-                userId,
-                chapterId: {
-                  in: course.chapters.map(chapter => chapter.id)
-                },
-                isCompleted: true
-              }
-            });
+      // Single query for all completed quizzes
+      const completedQuizResults = allQuizIds.length > 0 ? await db.quizResult.findMany({
+        where: {
+          studentId: userId,
+          quizId: { in: allQuizIds }
+        },
+        select: {
+          quizId: true
+        }
+      }) : [];
 
-            // Get completed quizzes
-            const completedQuizResults = await db.quizResult.findMany({
-                where: {
-                    studentId: userId,
-                    quizId: {
-                        in: course.quizzes.map(quiz => quiz.id)
-                    }
-                },
-                select: {
-                    quizId: true
-                }
-            });
+      // Create lookup maps for O(1) access
+      const completedChaptersMap = new Set(completedChaptersData.map((p: { chapterId: string }) => p.chapterId));
+      const completedQuizzesMap = new Set(completedQuizResults.map((r: { quizId: string }) => r.quizId));
 
-            // Count unique quizIds
-            const uniqueQuizIds = new Set(completedQuizResults.map(result => result.quizId));
-            completedQuizzes = uniqueQuizIds.size;
-          }
+      // Calculate progress for each course
+      const coursesWithProgress = courses.map((course: typeof courses[0]) => {
+        const totalChapters = course.chapters.length;
+        const totalQuizzes = course.quizzes.length;
+        const totalContent = totalChapters + totalQuizzes;
 
-          const completedContent = completedChapters + completedQuizzes;
-          const progress = totalContent > 0 ? (completedContent / totalContent) * 100 : 0;
+        let completedChapters = 0;
+        let completedQuizzes = 0;
 
-          return {
-            ...course,
-            progress
-          };
-        })
-      );
+        if (course.purchases && course.purchases.length > 0) {
+          // Count completed chapters for this course
+          completedChapters = course.chapters.filter((ch: { id: string }) => completedChaptersMap.has(ch.id)).length;
+          
+          // Count unique completed quizzes for this course
+          completedQuizzes = course.quizzes.filter((q: { id: string }) => completedQuizzesMap.has(q.id)).length;
+        }
+
+        const completedContent = completedChapters + completedQuizzes;
+        const progress = totalContent > 0 ? (completedContent / totalContent) * 100 : 0;
+
+        return {
+          ...course,
+          progress
+        };
+      });
 
       return NextResponse.json(coursesWithProgress);
     }
 
     // For unauthenticated users, return courses without progress
-    const coursesWithoutProgress = courses.map(course => ({
+    const coursesWithoutProgress = courses.map((course: typeof courses[0]) => ({
       ...course,
       progress: 0
     }));

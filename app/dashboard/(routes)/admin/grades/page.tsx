@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Progress } from "@/components/ui/progress";
 import { Search, Eye, Award, TrendingUp, Users, FileText } from "lucide-react";
 import { format } from "date-fns";
-import { ar } from "date-fns/locale";
+import { ar } from "date-fns/locale/ar";
 
 interface Course {
     id: string;

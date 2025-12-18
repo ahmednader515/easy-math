@@ -91,25 +91,18 @@ export async function PATCH(
 
         // Check permissions:
         // - ADMIN can update any course
-        // - TEACHER can only update their own courses
+        // - TEACHER can update any course
         // - Others cannot update
         const userRole = user?.role;
         const isAdmin = userRole === "ADMIN";
         const isTeacher = userRole === "TEACHER";
-        const isOwner = existingCourse.userId === userId;
         
         console.log("[COURSE_ID_PATCH] Permission check:", { 
             isAdmin, 
             isTeacher, 
-            isOwner, 
             userId, 
             courseUserId: existingCourse.userId,
             userRole,
-            userIdMatch: existingCourse.userId === userId,
-            userIdTypes: {
-                userId: typeof userId,
-                courseUserId: typeof existingCourse.userId
-            }
         });
         
         // Must be ADMIN or TEACHER
@@ -120,21 +113,9 @@ export async function PATCH(
                 { status: 403, headers: { 'Content-Type': 'application/json' } }
             );
         }
-        
-        // TEACHER can only update their own courses (unless they're also ADMIN)
-        if (isTeacher && !isAdmin && !isOwner) {
-            console.log("[COURSE_ID_PATCH] Forbidden - teacher can only update own courses", {
-                userId,
-                courseUserId: existingCourse.userId
-            });
-            return new NextResponse(
-                JSON.stringify({ error: "Forbidden - يمكنك تعديل كورساتك فقط" }), 
-                { status: 403, headers: { 'Content-Type': 'application/json' } }
-            );
-        }
 
         // Authorization already checked - use course ID for update
-        // ADMIN can update any course, TEACHER can only update their own (already verified)
+        // ADMIN and TEACHER can update any course
         console.log("[COURSE_ID_PATCH] Updating course with data:", values);
 
         const course = await db.course.update({

@@ -46,17 +46,24 @@ export const authOptions: AuthOptions = {
           },
         });
 
-        if (!user || !user.hashedPassword) {
-          throw new Error("Invalid credentials");
+        // Check if user exists
+        if (!user) {
+          throw new Error("USER_NOT_FOUND");
         }
 
+        // Check if user has a password (for accounts created via other methods)
+        if (!user.hashedPassword) {
+          throw new Error("NO_PASSWORD_SET");
+        }
+
+        // Verify password
         const isPasswordValid = await bcrypt.compare(
           credentials.password,
           user.hashedPassword
         );
 
         if (!isPasswordValid) {
-          throw new Error("Invalid credentials");
+          throw new Error("INVALID_PASSWORD");
         }
 
         return {

@@ -42,11 +42,8 @@ export default function SignInPage() {
       });
 
       if (result?.error) {
-        if (result.error === "CredentialsSignin") {
-          toast.error("رقم الهاتف أو كلمة المرور غير صحيحة");
-        } else {
-          toast.error("حدث خطأ أثناء تسجيل الدخول");
-        }
+        // Show unified error message for security (don't reveal which field is wrong)
+        toast.error("رقم الهاتف أو كلمة المرور خطأ");
         return;
       }
 

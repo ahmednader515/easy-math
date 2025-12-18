@@ -45,6 +45,13 @@ const getDivisionOptions = (grade: string | null | undefined) => {
                 { value: "علمي رياضة", label: "علمي رياضة" },
                 { value: "أدبي", label: "أدبي" },
             ];
+        case "الأول الاعدادي":
+        case "الثاني الاعدادي":
+        case "الثالث الاعدادي":
+            return [
+                { value: "بكالوريا", label: "بكالوريا" },
+                { value: "عام", label: "عام" },
+            ];
         default:
             return [];
     }
@@ -229,6 +236,9 @@ export const CourseGradeDivisionForm = ({
                                         </FormControl>
                                         <SelectContent>
                                             <SelectItem value="الكل">الكل (جميع الصفوف)</SelectItem>
+                                            <SelectItem value="الأول الاعدادي">الأول الاعدادي</SelectItem>
+                                            <SelectItem value="الثاني الاعدادي">الثاني الاعدادي</SelectItem>
+                                            <SelectItem value="الثالث الاعدادي">الثالث الاعدادي</SelectItem>
                                             <SelectItem value="الأول الثانوي">الأول الثانوي</SelectItem>
                                             <SelectItem value="الثاني الثانوي">الثاني الثانوي</SelectItem>
                                             <SelectItem value="الثالث الثانوي">الثالث الثانوي</SelectItem>

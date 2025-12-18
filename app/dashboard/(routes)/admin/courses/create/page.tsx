@@ -16,8 +16,8 @@ const AdminCreateCoursePage = async () => {
     },
   });
 
-  // Reuse the teacher editor UI for course setup
-  return redirect(`/dashboard/teacher/courses/${course.id}`);
+  // Redirect to admin course editor
+  return redirect(`/dashboard/admin/courses/${course.id}`);
 };
 
 export default AdminCreateCoursePage;

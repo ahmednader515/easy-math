@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatPrice } from "@/lib/format";
 import { format } from "date-fns";
-import { ar } from "date-fns/locale";
+import { ar } from "date-fns/locale/ar";
 
 export type Course = {
     id: string;
@@ -26,9 +26,10 @@ export const columns: ColumnDef<Course>[] = [
                 <Button
                     variant="ghost"
                     onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+                    className="flex-row-reverse"
                 >
                     العنوان
-                    <ArrowUpDown className="ml-2 h-4 w-4" />
+                    <ArrowUpDown className="mr-2 h-4 w-4" />
                 </Button>
             );
         },
@@ -40,9 +41,10 @@ export const columns: ColumnDef<Course>[] = [
                 <Button
                     variant="ghost"
                     onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+                    className="flex-row-reverse"
                 >
                     السعر
-                    <ArrowUpDown className="ml-2 h-4 w-4" />
+                    <ArrowUpDown className="mr-2 h-4 w-4" />
                 </Button>
             );
         },
@@ -58,9 +60,10 @@ export const columns: ColumnDef<Course>[] = [
                 <Button
                     variant="ghost"
                     onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+                    className="flex-row-reverse"
                 >
                     الحالة
-                    <ArrowUpDown className="ml-2 h-4 w-4" />
+                    <ArrowUpDown className="mr-2 h-4 w-4" />
                 </Button>
             );
         },
@@ -80,9 +83,10 @@ export const columns: ColumnDef<Course>[] = [
                 <Button
                     variant="ghost"
                     onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+                    className="flex-row-reverse"
                 >
                     انشئ في
-                    <ArrowUpDown className="ml-2 h-4 w-4" />
+                    <ArrowUpDown className="mr-2 h-4 w-4" />
                 </Button>
             );
         },
@@ -93,7 +97,7 @@ export const columns: ColumnDef<Course>[] = [
     },
     {
         id: "gradeDivision",
-        header: "الصف والقسم",
+        header: () => <div className="text-right">الصف والقسم</div>,
         cell: ({ row }) => {
             const grade = row.original.grade;
             const divisions = (row.original as any).divisions || [];

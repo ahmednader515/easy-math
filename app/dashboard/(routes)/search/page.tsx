@@ -34,7 +34,7 @@ export default async function SearchPage({
     const resolvedParams = await searchParams;
     const title = typeof resolvedParams.title === 'string' ? resolvedParams.title : '';
 
-    // Get user's grade and division for filtering
+    // Get user's grade and division for filtering (cached)
     const user = await db.user.findUnique({
         where: { id: session.user.id },
         select: { grade: true, division: true, role: true }
@@ -153,51 +153,60 @@ export default async function SearchPage({
         });
     }
 
-    const coursesWithProgress = await Promise.all(
-        courses.map(async (course) => {
-            const totalChapters = course.chapters.length;
-            const totalQuizzes = course.quizzes.length;
-            const totalContent = totalChapters + totalQuizzes;
+    // Batch all progress queries to avoid N+1 problem
+    const allChapterIds = courses.flatMap(course => course.chapters.map(ch => ch.id));
+    const allQuizIds = courses.flatMap(course => course.quizzes.map(q => q.id));
 
-            const completedChapters = await db.userProgress.count({
-                where: {
-                    userId: session.user.id,
-                    chapterId: {
-                        in: course.chapters.map(chapter => chapter.id)
-                    },
-                    isCompleted: true
-                }
-            });
+    // Single query for all completed chapters
+    const completedChaptersData = allChapterIds.length > 0 ? await db.userProgress.findMany({
+        where: {
+            userId: session.user.id,
+            chapterId: { in: allChapterIds },
+            isCompleted: true
+        },
+        select: {
+            chapterId: true
+        }
+    }) : [];
 
-            // Get unique completed quizzes
-            const completedQuizResults = await db.quizResult.findMany({
-                where: {
-                    studentId: session.user.id,
-                    quizId: {
-                        in: course.quizzes.map(quiz => quiz.id)
-                    }
-                },
-                select: {
-                    quizId: true
-                }
-            });
+    // Single query for all completed quizzes
+    const completedQuizResults = allQuizIds.length > 0 ? await db.quizResult.findMany({
+        where: {
+            studentId: session.user.id,
+            quizId: { in: allQuizIds }
+        },
+        select: {
+            quizId: true
+        }
+    }) : [];
 
-            // Count unique quizIds
-            const uniqueQuizIds = new Set(completedQuizResults.map(result => result.quizId));
-            const completedQuizzes = uniqueQuizIds.size;
+    // Create lookup maps for O(1) access
+    const completedChaptersMap = new Set(completedChaptersData.map(p => p.chapterId));
+    const completedQuizzesMap = new Set(completedQuizResults.map(r => r.quizId));
 
-            const completedContent = completedChapters + completedQuizzes;
+    // Calculate progress for each course
+    const coursesWithProgress = courses.map((course) => {
+        const totalChapters = course.chapters.length;
+        const totalQuizzes = course.quizzes.length;
+        const totalContent = totalChapters + totalQuizzes;
 
-            const progress = totalContent > 0 
-                ? (completedContent / totalContent) * 100 
-                : 0;
+        // Count completed chapters for this course
+        const completedChapters = course.chapters.filter(ch => completedChaptersMap.has(ch.id)).length;
+        
+        // Count unique completed quizzes for this course
+        const completedQuizzes = course.quizzes.filter(q => completedQuizzesMap.has(q.id)).length;
 
-            return {
-                ...course,
-                progress
-            } as CourseWithDetails;
-        })
-    );
+        const completedContent = completedChapters + completedQuizzes;
+
+        const progress = totalContent > 0 
+            ? (completedContent / totalContent) * 100 
+            : 0;
+
+        return {
+            ...course,
+            progress
+        } as CourseWithDetails;
+    });
 
     return (
         <div className="p-6 space-y-6">

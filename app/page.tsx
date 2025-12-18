@@ -9,6 +9,7 @@ import { Navbar } from "@/components/navbar";
 import { ScrollProgress } from "@/components/scroll-progress";
 import { useEffect, useState } from "react";
 import { RecaptchaGate } from "@/components/recaptcha-gate";
+import { useSession } from "next-auth/react";
 
 // Define types based on Prisma schema
 type Course = {
@@ -34,6 +35,7 @@ export default function HomePage() {
   const [courses, setCourses] = useState<CourseWithProgress[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showScrollIndicator, setShowScrollIndicator] = useState(true);
+  const { data: session } = useSession();
 
   useEffect(() => {
     const fetchCourses = async () => {
@@ -381,7 +383,7 @@ export default function HomePage() {
                         variant="default"
                         asChild
                       >
-                        <Link href={`/courses/${course.id}/preview`}>
+                        <Link href={session?.user ? `/courses/${course.id}/preview` : `/sign-in`}>
                           عرض الكورس
                         </Link>
                       </Button>

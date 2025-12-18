@@ -19,7 +19,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { formatPrice } from "@/lib/format";
 import { format } from "date-fns";
-import { ar } from "date-fns/locale";
+import { ar } from "date-fns/locale/ar";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -138,7 +138,7 @@ export function AdminCoursesTable({ courses, onDeleted }: { courses: Course[]; o
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
-                      <Link href={`/dashboard/teacher/courses/${course.id}`}>
+                      <Link href={`/dashboard/admin/courses/${course.id}`}>
                         <Button variant="ghost" size="icon" title="تعديل الكورس">
                           <Pencil className="h-4 w-4" />
                         </Button>
