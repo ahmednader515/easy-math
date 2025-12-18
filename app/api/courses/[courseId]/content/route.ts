@@ -38,8 +38,8 @@ export async function GET(
             }
         }
 
-        // Fetch chapters and quizzes in parallel
-        const [chapters, quizzes] = await Promise.all([
+        // Fetch chapters, quizzes, and livestreams in parallel
+        const [chapters, quizzes, livestreams] = await Promise.all([
             db.chapter.findMany({
                 where: {
                     courseId: resolvedParams.courseId,
@@ -80,10 +80,49 @@ export async function GET(
                 orderBy: {
                     position: "asc"
                 }
+            }),
+            db.liveStream.findMany({
+                where: {
+                    courseId: resolvedParams.courseId,
+                    isPublished: true
+                },
+                select: {
+                    id: true,
+                    title: true,
+                    description: true,
+                    meetingUrl: true,
+                    meetingType: true,
+                    scheduledAt: true,
+                    duration: true,
+                    createdAt: true,
+                    updatedAt: true
+                },
+                orderBy: {
+                    scheduledAt: "asc"
+                }
             })
         ]);
 
+        // Filter out expired livestreams (accounting for duration)
+        const now = new Date();
+        const activeLiveStreams = livestreams.filter(ls => {
+            if (!ls.scheduledAt) {
+                // Immediate livestreams (no schedule) are always active
+                return true;
+            }
+            
+            const scheduledTime = new Date(ls.scheduledAt);
+            // Calculate end time: scheduled time + duration (in milliseconds)
+            const endTime = ls.duration 
+                ? new Date(scheduledTime.getTime() + (ls.duration * 60 * 1000))
+                : scheduledTime;
+            
+            // Show if livestream hasn't ended yet
+            return endTime >= now;
+        });
+
         // Combine and sort by position
+        // Livestreams use scheduledAt timestamp as position (or 999999 if not scheduled)
         const allContent = [
             ...chapters.map(chapter => ({
                 ...chapter,
@@ -96,6 +135,11 @@ export async function GET(
                 type: 'quiz' as const,
                 // Only include quizResults if user has access
                 quizResults: hasAccess ? quiz.quizResults : undefined
+            })),
+            ...activeLiveStreams.map(livestream => ({
+                ...livestream,
+                type: 'livestream' as const,
+                position: livestream.scheduledAt ? new Date(livestream.scheduledAt).getTime() : 999999 // Live streams appear at the end
             }))
         ].sort((a, b) => a.position - b.position);
 

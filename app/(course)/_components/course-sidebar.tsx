@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, use } from "react";
 import { useParams, usePathname, useRouter } from "next/navigation";
-import { CheckCircle, Circle } from "lucide-react";
+import { CheckCircle, Circle, Video } from "lucide-react";
 import axios from "axios";
 import { cn } from "@/lib/utils";
 
@@ -31,7 +31,7 @@ interface CourseContent {
   id: string;
   title: string;
   position: number;
-  type: 'chapter' | 'quiz';
+  type: 'chapter' | 'quiz' | 'livestream';
   isFree?: boolean;
   userProgress?: {
     isCompleted: boolean;
@@ -107,6 +107,8 @@ export const CourseSidebar = ({ course }: CourseSidebarProps) => {
         router.push(`/courses/${courseId}/chapters/${content.id}`);
       } else if (content.type === 'quiz') {
         router.push(`/courses/${courseId}/quizzes/${content.id}`);
+      } else if (content.type === 'livestream') {
+        router.push(`/courses/${courseId}/livestreams/${content.id}`);
       }
       router.refresh();
     }
@@ -169,10 +171,16 @@ export const CourseSidebar = ({ course }: CourseSidebarProps) => {
               ) : (
                 <Circle className="h-4 w-4" />
               )}
-              <span className="rtl:text-right ltr:text-left flex-grow mr-1">
+              <span className="rtl:text-right ltr:text-left flex-grow mr-1 flex items-center gap-2">
+                {content.type === 'livestream' && (
+                  <Video className="h-4 w-4 text-red-600" />
+                )}
                 {content.title}
                 {content.type === 'quiz' && (
                   <span className="ml-2 text-xs text-green-600">(اختبار)</span>
+                )}
+                {content.type === 'livestream' && (
+                  <span className="ml-2 text-xs text-red-600">(بث مباشر)</span>
                 )}
               </span>
               {content.type === 'chapter' && content.isFree && (

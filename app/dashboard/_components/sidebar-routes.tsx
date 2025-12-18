@@ -1,6 +1,6 @@
 "use client";
 
-import { BarChart, Compass, Layout, List, Wallet, Shield, Users, Eye, TrendingUp, BookOpen, FileText, Award, PlusSquare, Key, Ticket } from "lucide-react";
+import { BarChart, Compass, Layout, List, Wallet, Shield, Users, Eye, TrendingUp, BookOpen, FileText, Award, PlusSquare, Key, Ticket, Video } from "lucide-react";
 import { SidebarItem } from "./sidebar-item";
 import { usePathname } from "next/navigation";
 
@@ -32,6 +32,11 @@ const teacherRoutes = [
         icon: FileText,
         label: "الاختبارات",
         href: "/dashboard/teacher/quizzes",
+    },
+    {
+        icon: Video,
+        label: "البثوث المباشرة",
+        href: "/dashboard/teacher/livestreams",
     },
     {
         icon: Award,

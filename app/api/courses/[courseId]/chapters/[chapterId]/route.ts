@@ -46,7 +46,7 @@ export async function GET(
       return new NextResponse("Chapter not found", { status: 404 });
     }
 
-    const [chapters, quizzes] = await db.$transaction([
+    const [chapters, quizzes, livestreams] = await Promise.all([
       db.chapter.findMany({
         where: {
           courseId: courseId,
@@ -72,13 +72,50 @@ export async function GET(
         orderBy: {
           position: "asc"
         }
+      }),
+      db.liveStream.findMany({
+        where: {
+          courseId: courseId,
+          isPublished: true
+        },
+        select: {
+          id: true,
+          scheduledAt: true,
+          duration: true
+        },
+        orderBy: {
+          scheduledAt: "asc"
+        }
       })
     ]);
 
+    // Filter out expired livestreams (accounting for duration)
+    const now = new Date();
+    const activeLiveStreams = livestreams.filter(ls => {
+      if (!ls.scheduledAt) {
+        // Immediate livestreams (no schedule) are always active
+        return true;
+      }
+      
+      const scheduledTime = new Date(ls.scheduledAt);
+      // Calculate end time: scheduled time + duration (in milliseconds)
+      const endTime = ls.duration 
+        ? new Date(scheduledTime.getTime() + (ls.duration * 60 * 1000))
+        : scheduledTime;
+      
+      // Show if livestream hasn't ended yet
+      return endTime >= now;
+    });
+
     const chaptersWithType = chapters.map(chapter => ({ ...chapter, type: 'chapter' as const }));
     const quizzesWithType = quizzes.map(quiz => ({ ...quiz, type: 'quiz' as const }));
+    const livestreamsWithType = activeLiveStreams.map(ls => ({ 
+      ...ls, 
+      type: 'livestream' as const, 
+      position: ls.scheduledAt ? new Date(ls.scheduledAt).getTime() : 999999 
+    }));
 
-    const sortedContent = [...chaptersWithType, ...quizzesWithType].sort((a, b) => a.position - b.position);
+    const sortedContent = [...chaptersWithType, ...quizzesWithType, ...livestreamsWithType].sort((a, b) => a.position - b.position);
 
     const currentIndex = sortedContent.findIndex(content => 
       content.id === chapterId && content.type === 'chapter'
