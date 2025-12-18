@@ -196,7 +196,7 @@ const TeacherPromoCodesPage = () => {
         <div className="p-6 space-y-6">
             <div className="flex items-center justify-between">
                 <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-                    كوبونات الخصم
+                    الاكواد
                 </h1>
                 <Button onClick={openCreateDialog} className="bg-[#0083d3] hover:bg-[#0083d3]/90">
                     <Plus className="h-4 w-4 mr-2" />
