@@ -80,7 +80,7 @@ const teacherRoutes = [
     },
     {
         icon: Ticket,
-        label: "الاكواد",
+        label: "الأكواد",
         href: "/dashboard/teacher/promocodes",
     },
 ];
@@ -133,7 +133,7 @@ const adminRoutes = [
     },
     {
         icon: Ticket,
-        label: "الاكواد",
+        label: "الأكواد",
         href: "/dashboard/admin/promocodes",
     },
 ];

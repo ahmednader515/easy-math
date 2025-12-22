@@ -117,6 +117,7 @@ export default function CoursePreviewPage({
                 body: JSON.stringify({
                     code: promocode.trim(),
                     coursePrice: course.price || 0,
+                    courseId: courseId,
                 }),
             });
 

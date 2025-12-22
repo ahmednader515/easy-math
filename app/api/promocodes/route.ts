@@ -26,6 +26,14 @@ export async function GET(req: NextRequest) {
         }
 
         const promocodes = await db.promoCode.findMany({
+            include: {
+                course: {
+                    select: {
+                        id: true,
+                        title: true,
+                    },
+                },
+            },
             orderBy: {
                 createdAt: "desc",
             },
@@ -46,7 +54,17 @@ export async function GET(req: NextRequest) {
     }
 }
 
-// POST create new promocode - for teachers and admins
+// Generate a unique promo code
+function generatePromoCode(): string {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Removed confusing characters like 0, O, I, 1
+    let code = '';
+    for (let i = 0; i < 8; i++) {
+        code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return code;
+}
+
+// POST create new promocodes - for teachers and admins
 export async function POST(req: NextRequest) {
     try {
         const { userId, user } = await auth();
@@ -61,40 +79,32 @@ export async function POST(req: NextRequest) {
         }
 
         const body = await req.json();
-        const {
-            code,
-            discountType,
-            discountValue,
-            minPurchase,
-            maxDiscount,
-            usageLimit,
-            isActive,
-            validFrom,
-            validUntil,
-            description,
-        } = body;
+        const { courseId, numberOfCodes } = body;
 
         // Validate required fields
-        if (!code || !discountType || discountValue === undefined) {
+        if (!courseId) {
             return new NextResponse(
-                JSON.stringify({ error: "الرمز ونوع الخصم وقيمة الخصم مطلوبة" }),
+                JSON.stringify({ error: "الكورس مطلوب" }),
                 { status: 400, headers: { "Content-Type": "application/json" } }
             );
         }
 
-        // Validate discount type
-        if (discountType !== "PERCENTAGE" && discountType !== "FIXED") {
+        if (!numberOfCodes || numberOfCodes < 1 || numberOfCodes > 100) {
             return new NextResponse(
-                JSON.stringify({ error: "نوع الخصم يجب أن يكون PERCENTAGE أو FIXED" }),
+                JSON.stringify({ error: "عدد الأكواد يجب أن يكون بين 1 و 100" }),
                 { status: 400, headers: { "Content-Type": "application/json" } }
             );
         }
 
-        // Validate discount value
-        if (discountValue <= 0) {
+        // Check if course exists
+        const course = await db.course.findUnique({
+            where: { id: courseId },
+        });
+
+        if (!course) {
             return new NextResponse(
-                JSON.stringify({ error: "قيمة الخصم يجب أن تكون أكبر من الصفر" }),
-                { status: 400, headers: { "Content-Type": "application/json" } }
+                JSON.stringify({ error: "الكورس غير موجود" }),
+                { status: 404, headers: { "Content-Type": "application/json" } }
             );
         }
 
@@ -107,35 +117,53 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        // Check if code already exists
-        const existingCode = await db.promoCode.findUnique({
-            where: { code: code.toUpperCase().trim() },
-        });
+        // Generate unique codes
+        const codesToCreate: string[] = [];
+        let attempts = 0;
+        const maxAttempts = numberOfCodes * 10; // Prevent infinite loop
 
-        if (existingCode) {
+        while (codesToCreate.length < numberOfCodes && attempts < maxAttempts) {
+            attempts++;
+            const newCode = generatePromoCode();
+            
+            // Check if code already exists
+            const existingCode = await db.promoCode.findUnique({
+                where: { code: newCode },
+            });
+
+            if (!existingCode && !codesToCreate.includes(newCode)) {
+                codesToCreate.push(newCode);
+            }
+        }
+
+        if (codesToCreate.length < numberOfCodes) {
             return new NextResponse(
-                JSON.stringify({ error: "رمز الكود موجود بالفعل" }),
-                { status: 400, headers: { "Content-Type": "application/json" } }
+                JSON.stringify({ error: "فشل في إنشاء العدد المطلوب من الأكواد. يرجى المحاولة مرة أخرى." }),
+                { status: 500, headers: { "Content-Type": "application/json" } }
             );
         }
 
-        // Create promocode
-        const promocode = await db.promoCode.create({
-            data: {
-                code: code.toUpperCase().trim(),
-                discountType,
-                discountValue,
-                minPurchase: minPurchase || null,
-                maxDiscount: maxDiscount || null,
-                usageLimit: usageLimit || null,
-                isActive: isActive !== undefined ? isActive : true,
-                validFrom: validFrom ? new Date(validFrom) : null,
-                validUntil: validUntil ? new Date(validUntil) : null,
-                description: description || null,
-            },
-        });
+        // Create all promocodes in a transaction
+        const createdPromocodes = await db.$transaction(
+            codesToCreate.map(code =>
+                db.promoCode.create({
+                    data: {
+                        code,
+                        courseId,
+                        discountType: "PERCENTAGE",
+                        discountValue: 100, // 100% discount
+                        usageLimit: 1, // Each code can be used once
+                        isActive: true,
+                    },
+                })
+            )
+        );
 
-        return NextResponse.json(promocode);
+        return NextResponse.json({
+            success: true,
+            count: createdPromocodes.length,
+            codes: createdPromocodes.map(pc => pc.code),
+        });
     } catch (error) {
         console.error("[PROMOCODES_POST]", error);
         if (error instanceof Error) {

@@ -7,15 +7,15 @@ export async function POST(req: NextRequest) {
     try {
         const { userId } = await auth();
         const body = await req.json();
-        const { code, coursePrice } = body;
+        const { code, coursePrice, courseId } = body;
 
         if (!userId) {
             return new NextResponse("Unauthorized", { status: 401 });
         }
 
-        if (!code || !coursePrice) {
+        if (!code || coursePrice === undefined || !courseId) {
             return new NextResponse(
-                JSON.stringify({ error: "رمز الكود وسعر الكورس مطلوبان" }),
+                JSON.stringify({ error: "رمز الكود وسعر الكورس ومعرف الكورس مطلوبان" }),
                 { status: 400, headers: { "Content-Type": "application/json" } }
             );
         }
@@ -60,6 +60,14 @@ export async function POST(req: NextRequest) {
         if (promocode.usageLimit && promocode.usedCount >= promocode.usageLimit) {
             return new NextResponse(
                 JSON.stringify({ error: "تم استنفاذ عدد مرات استخدام هذا الكود" }),
+                { status: 400, headers: { "Content-Type": "application/json" } }
+            );
+        }
+
+        // Check if promocode is for this course
+        if (promocode.courseId !== courseId) {
+            return new NextResponse(
+                JSON.stringify({ error: "هذا الكود غير صالح لهذا الكورس" }),
                 { status: 400, headers: { "Content-Type": "application/json" } }
             );
         }

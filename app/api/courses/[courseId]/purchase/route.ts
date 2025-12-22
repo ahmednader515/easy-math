@@ -72,6 +72,11 @@ export async function POST(
       });
 
       if (promocode && promocode.isActive) {
+        // Check if promocode is for this course
+        if (promocode.courseId !== resolvedParams.courseId) {
+          return new NextResponse("This promocode is not valid for this course", { status: 400 });
+        }
+
         const now = new Date();
         const isValidDate = 
           (!promocode.validFrom || new Date(promocode.validFrom) <= now) &&

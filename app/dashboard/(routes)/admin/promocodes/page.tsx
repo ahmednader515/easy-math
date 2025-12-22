@@ -9,48 +9,57 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Edit, Trash2, Search, Ticket } from "lucide-react";
+import { Plus, Trash2, Search, Ticket, BookOpen } from "lucide-react";
 import { toast } from "sonner";
 
 interface PromoCode {
     id: string;
     code: string;
-    discountType: "PERCENTAGE" | "FIXED";
-    discountValue: number;
-    minPurchase: number | null;
-    maxDiscount: number | null;
-    usageLimit: number | null;
+    courseId: string;
+    course: {
+        id: string;
+        title: string;
+    };
     usedCount: number;
+    usageLimit: number | null;
     isActive: boolean;
-    validFrom: string | null;
-    validUntil: string | null;
-    description: string | null;
     createdAt: string;
-    updatedAt: string;
+}
+
+interface Course {
+    id: string;
+    title: string;
 }
 
 const AdminPromoCodesPage = () => {
     const [promocodes, setPromocodes] = useState<PromoCode[]>([]);
+    const [courses, setCourses] = useState<Course[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
     const [isDialogOpen, setIsDialogOpen] = useState(false);
-    const [editingPromocode, setEditingPromocode] = useState<PromoCode | null>(null);
     
     // Form state
-    const [code, setCode] = useState("");
-    const [discountType, setDiscountType] = useState<"PERCENTAGE" | "FIXED">("PERCENTAGE");
-    const [discountValue, setDiscountValue] = useState("");
-    const [minPurchase, setMinPurchase] = useState("");
-    const [maxDiscount, setMaxDiscount] = useState("");
-    const [usageLimit, setUsageLimit] = useState("");
-    const [isActive, setIsActive] = useState(true);
-    const [validFrom, setValidFrom] = useState("");
-    const [validUntil, setValidUntil] = useState("");
-    const [description, setDescription] = useState("");
+    const [selectedCourseId, setSelectedCourseId] = useState("");
+    const [numberOfCodes, setNumberOfCodes] = useState("");
 
     useEffect(() => {
         fetchPromocodes();
+        fetchCourses();
     }, []);
+
+    const fetchCourses = async () => {
+        try {
+            const response = await fetch("/api/courses");
+            if (response.ok) {
+                const data = await response.json();
+                // Filter only published courses
+                const publishedCourses = data.filter((course: Course) => course.isPublished);
+                setCourses(publishedCourses);
+            }
+        } catch (error) {
+            console.error("Error fetching courses:", error);
+        }
+    };
 
     const fetchPromocodes = async () => {
         try {
@@ -59,28 +68,19 @@ const AdminPromoCodesPage = () => {
                 const data = await response.json();
                 setPromocodes(data);
             } else {
-                toast.error("حدث خطأ أثناء جلب الاكواد");
+                toast.error("حدث خطأ أثناء جلب الأكواد");
             }
         } catch (error) {
             console.error("Error fetching promocodes:", error);
-            toast.error("حدث خطأ أثناء جلب الاكواد");
+            toast.error("حدث خطأ أثناء جلب الأكواد");
         } finally {
             setLoading(false);
         }
     };
 
     const resetForm = () => {
-        setCode("");
-        setDiscountType("PERCENTAGE");
-        setDiscountValue("");
-        setMinPurchase("");
-        setMaxDiscount("");
-        setUsageLimit("");
-        setIsActive(true);
-        setValidFrom("");
-        setValidUntil("");
-        setDescription("");
-        setEditingPromocode(null);
+        setSelectedCourseId("");
+        setNumberOfCodes("");
     };
 
     const openCreateDialog = () => {
@@ -88,62 +88,33 @@ const AdminPromoCodesPage = () => {
         setIsDialogOpen(true);
     };
 
-    const openEditDialog = (promocode: PromoCode) => {
-        setCode(promocode.code);
-        setDiscountType(promocode.discountType);
-        setDiscountValue(promocode.discountValue.toString());
-        setMinPurchase(promocode.minPurchase?.toString() || "");
-        setMaxDiscount(promocode.maxDiscount?.toString() || "");
-        setUsageLimit(promocode.usageLimit?.toString() || "");
-        setIsActive(promocode.isActive);
-        setValidFrom(promocode.validFrom ? promocode.validFrom.split("T")[0] : "");
-        setValidUntil(promocode.validUntil ? promocode.validUntil.split("T")[0] : "");
-        setDescription(promocode.description || "");
-        setEditingPromocode(promocode);
-        setIsDialogOpen(true);
-    };
-
     const handleSubmit = async () => {
         // Validation
-        if (!code.trim()) {
-            toast.error("رمز الكود مطلوب");
+        if (!selectedCourseId) {
+            toast.error("يرجى اختيار الكورس");
             return;
         }
 
-        if (!discountValue || parseFloat(discountValue) <= 0) {
-            toast.error("قيمة الخصم يجب أن تكون أكبر من الصفر");
+        const numCodes = parseInt(numberOfCodes);
+        if (!numberOfCodes || numCodes <= 0 || numCodes > 100) {
+            toast.error("يرجى إدخال عدد صحيح بين 1 و 100");
             return;
         }
-
-        const data = {
-            code: code.trim(),
-            discountType,
-            discountValue: parseFloat(discountValue),
-            minPurchase: minPurchase ? parseFloat(minPurchase) : null,
-            maxDiscount: maxDiscount ? parseFloat(maxDiscount) : null,
-            usageLimit: usageLimit ? parseInt(usageLimit) : null,
-            isActive,
-            validFrom: validFrom || null,
-            validUntil: validUntil || null,
-            description: description.trim() || null,
-        };
 
         try {
-            const url = editingPromocode 
-                ? `/api/promocodes/${editingPromocode.id}`
-                : "/api/promocodes";
-            const method = editingPromocode ? "PATCH" : "POST";
-
-            const response = await fetch(url, {
-                method,
+            const response = await fetch("/api/promocodes", {
+                method: "POST",
                 headers: {
                     "Content-Type": "application/json",
                 },
-                body: JSON.stringify(data),
+                body: JSON.stringify({
+                    courseId: selectedCourseId,
+                    numberOfCodes: numCodes,
+                }),
             });
 
             if (response.ok) {
-                toast.success(editingPromocode ? "تم تحديث الكود بنجاح" : "تم إنشاء الكود بنجاح");
+                toast.success(`تم إنشاء ${numCodes} كود بنجاح`);
                 setIsDialogOpen(false);
                 resetForm();
                 fetchPromocodes();
@@ -152,8 +123,8 @@ const AdminPromoCodesPage = () => {
                 toast.error(errorData.error || "حدث خطأ");
             }
         } catch (error) {
-            console.error("Error saving promocode:", error);
-            toast.error("حدث خطأ أثناء حفظ الكود");
+            console.error("Error creating promocodes:", error);
+            toast.error("حدث خطأ أثناء إنشاء الأكواد");
         }
     };
 
@@ -181,7 +152,7 @@ const AdminPromoCodesPage = () => {
 
     const filteredPromocodes = promocodes.filter(promo =>
         promo.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (promo.description && promo.description.toLowerCase().includes(searchTerm.toLowerCase()))
+        promo.course.title.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     if (loading) {
@@ -196,21 +167,21 @@ const AdminPromoCodesPage = () => {
         <div className="p-6 space-y-6">
             <div className="flex items-center justify-between">
                 <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-                    الاكواد
+                    الأكواد
                 </h1>
                 <Button onClick={openCreateDialog} className="bg-[#0083d3] hover:bg-[#0083d3]/90">
                     <Plus className="h-4 w-4 mr-2" />
-                    إنشاء كود جديد
+                    إنشاء أكواد جديدة
                 </Button>
             </div>
 
             <Card>
                 <CardHeader>
-                    <CardTitle>قائمة الاكواد</CardTitle>
+                    <CardTitle>قائمة الأكواد</CardTitle>
                     <div className="flex items-center space-x-2 mt-4">
                         <Search className="h-4 w-4 text-muted-foreground" />
                         <Input
-                            placeholder="البحث برمز الكود أو الوصف..."
+                            placeholder="البحث برمز الكود أو اسم الكورس..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             className="max-w-sm"
@@ -223,11 +194,10 @@ const AdminPromoCodesPage = () => {
                             <TableHeader>
                                 <TableRow>
                                     <TableHead className="text-right">الرمز</TableHead>
-                                    <TableHead className="text-right">نوع الخصم</TableHead>
-                                    <TableHead className="text-right">قيمة الخصم</TableHead>
-                                    <TableHead className="text-right">الحد الأدنى</TableHead>
+                                    <TableHead className="text-right">الكورس</TableHead>
                                     <TableHead className="text-right">الاستخدام</TableHead>
                                     <TableHead className="text-right">الحالة</TableHead>
+                                    <TableHead className="text-right">تاريخ الإنشاء</TableHead>
                                     <TableHead className="text-right">الإجراءات</TableHead>
                                 </TableRow>
                             </TableHeader>
@@ -241,15 +211,10 @@ const AdminPromoCodesPage = () => {
                                             </Badge>
                                         </TableCell>
                                         <TableCell>
-                                            {promo.discountType === "PERCENTAGE" ? "نسبة مئوية" : "مبلغ ثابت"}
-                                        </TableCell>
-                                        <TableCell>
-                                            {promo.discountType === "PERCENTAGE" 
-                                                ? `${promo.discountValue}%` 
-                                                : `${promo.discountValue} جنيه`}
-                                        </TableCell>
-                                        <TableCell>
-                                            {promo.minPurchase ? `${promo.minPurchase} جنيه` : "-"}
+                                            <div className="flex items-center gap-2">
+                                                <BookOpen className="h-4 w-4 text-muted-foreground" />
+                                                <span>{promo.course.title}</span>
+                                            </div>
                                         </TableCell>
                                         <TableCell>
                                             {promo.usageLimit 
@@ -262,14 +227,10 @@ const AdminPromoCodesPage = () => {
                                             </Badge>
                                         </TableCell>
                                         <TableCell>
+                                            {new Date(promo.createdAt).toLocaleDateString('ar-EG')}
+                                        </TableCell>
+                                        <TableCell>
                                             <div className="flex gap-2 justify-end">
-                                                <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                    onClick={() => openEditDialog(promo)}
-                                                >
-                                                    <Edit className="h-4 w-4" />
-                                                </Button>
                                                 <Button
                                                     size="sm"
                                                     variant="destructive"
@@ -285,146 +246,52 @@ const AdminPromoCodesPage = () => {
                         </Table>
                     ) : (
                         <div className="text-center text-muted-foreground py-8">
-                            {searchTerm ? "لا توجد نتائج" : "لا توجد كودات"}
+                            {searchTerm ? "لا توجد نتائج" : "لا توجد أكواد"}
                         </div>
                     )}
                 </CardContent>
             </Card>
 
-            {/* Create/Edit Dialog */}
+            {/* Create Dialog */}
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                <DialogContent className="max-w-md">
                     <DialogHeader>
-                        <DialogTitle>
-                            {editingPromocode ? "تعديل الكود" : "إنشاء كود جديد"}
-                        </DialogTitle>
+                        <DialogTitle>إنشاء أكواد جديدة</DialogTitle>
                         <DialogDescription>
-                            {editingPromocode ? "قم بتعديل بيانات الكود" : "قم بإنشاء كود خصم جديد"}
+                            اختر الكورس وعدد الأكواد المراد إنشاؤها. كل كود يعطي خصم 100% على الكورس المحدد.
                         </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 mt-4">
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="code">رمز الكود *</Label>
-                                <Input
-                                    id="code"
-                                    value={code}
-                                    onChange={(e) => setCode(e.target.value.toUpperCase())}
-                                    placeholder="مثال: SUMMER2024"
-                                    disabled={!!editingPromocode}
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="discountType">نوع الخصم *</Label>
-                                <Select value={discountType} onValueChange={(value: "PERCENTAGE" | "FIXED") => setDiscountType(value)}>
-                                    <SelectTrigger>
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="PERCENTAGE">نسبة مئوية (%)</SelectItem>
-                                        <SelectItem value="FIXED">مبلغ ثابت (جنيه)</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="discountValue">قيمة الخصم *</Label>
-                                <Input
-                                    id="discountValue"
-                                    type="number"
-                                    value={discountValue}
-                                    onChange={(e) => setDiscountValue(e.target.value)}
-                                    placeholder={discountType === "PERCENTAGE" ? "مثال: 20" : "مثال: 50"}
-                                    min="0"
-                                    step="0.01"
-                                />
-                            </div>
-                            {discountType === "PERCENTAGE" && (
-                                <div className="space-y-2">
-                                    <Label htmlFor="maxDiscount">الحد الأقصى للخصم (جنيه)</Label>
-                                    <Input
-                                        id="maxDiscount"
-                                        type="number"
-                                        value={maxDiscount}
-                                        onChange={(e) => setMaxDiscount(e.target.value)}
-                                        placeholder="مثال: 100"
-                                        min="0"
-                                        step="0.01"
-                                    />
-                                </div>
-                            )}
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="minPurchase">الحد الأدنى للشراء (جنيه)</Label>
-                                <Input
-                                    id="minPurchase"
-                                    type="number"
-                                    value={minPurchase}
-                                    onChange={(e) => setMinPurchase(e.target.value)}
-                                    placeholder="مثال: 100"
-                                    min="0"
-                                    step="0.01"
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="usageLimit">الحد الأقصى للاستخدام</Label>
-                                <Input
-                                    id="usageLimit"
-                                    type="number"
-                                    value={usageLimit}
-                                    onChange={(e) => setUsageLimit(e.target.value)}
-                                    placeholder="مثال: 100"
-                                    min="1"
-                                />
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="validFrom">تاريخ البداية</Label>
-                                <Input
-                                    id="validFrom"
-                                    type="date"
-                                    value={validFrom}
-                                    onChange={(e) => setValidFrom(e.target.value)}
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="validUntil">تاريخ الانتهاء</Label>
-                                <Input
-                                    id="validUntil"
-                                    type="date"
-                                    value={validUntil}
-                                    onChange={(e) => setValidUntil(e.target.value)}
-                                />
-                            </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="course">الكورس *</Label>
+                            <Select value={selectedCourseId} onValueChange={setSelectedCourseId}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="اختر الكورس" />
+                                </SelectTrigger>
+                                <SelectContent className="z-[102]">
+                                    {courses.map((course) => (
+                                        <SelectItem key={course.id} value={course.id}>
+                                            {course.title}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
                         </div>
 
                         <div className="space-y-2">
-                            <Label htmlFor="description">الوصف</Label>
+                            <Label htmlFor="numberOfCodes">عدد الأكواد *</Label>
                             <Input
-                                id="description"
-                                value={description}
-                                onChange={(e) => setDescription(e.target.value)}
-                                placeholder="وصف الكود (اختياري)"
+                                id="numberOfCodes"
+                                type="number"
+                                value={numberOfCodes}
+                                onChange={(e) => setNumberOfCodes(e.target.value)}
+                                placeholder="مثال: 10"
+                                min="1"
+                                max="100"
                             />
-                        </div>
-
-                        <div className="flex items-center space-x-2">
-                            <input
-                                type="checkbox"
-                                id="isActive"
-                                checked={isActive}
-                                onChange={(e) => setIsActive(e.target.checked)}
-                                className="w-4 h-4"
-                            />
-                            <Label htmlFor="isActive" className="cursor-pointer">
-                                نشط
-                            </Label>
+                            <p className="text-sm text-muted-foreground">
+                                يمكن إنشاء من 1 إلى 100 كود في المرة الواحدة
+                            </p>
                         </div>
 
                         <div className="flex justify-end gap-2 pt-4">
@@ -432,7 +299,7 @@ const AdminPromoCodesPage = () => {
                                 إلغاء
                             </Button>
                             <Button onClick={handleSubmit} className="bg-[#0083d3] hover:bg-[#0083d3]/90">
-                                {editingPromocode ? "تحديث" : "إنشاء"}
+                                إنشاء
                             </Button>
                         </div>
                     </div>
