@@ -48,7 +48,7 @@ export default async function SearchPage({
         title 
     });
 
-    // Build where clause - filter by user's grade/division if they're a student
+    // Build where clause - filter by user's grade if they're a student
     let whereClause: any = {
         isPublished: true,
     };
@@ -61,34 +61,25 @@ export default async function SearchPage({
         };
     }
 
-    // Filter by student's grade and division if they're a regular user
+    // Filter by student's grade if they're a regular user
     // If user is teacher/admin, show all courses
-    if (user && user.role === "USER" && user.grade && user.division) {
+    if (user && user.role === "USER" && user.grade) {
         // Build the filter for courses:
         // 1. Courses with grade="الكل" - show to everyone
-        // 2. Courses with matching grade AND student's division in the divisions array
-        const gradeDivisionFilter = {
+        // 2. Courses with matching grade
+        const gradeFilter = {
             OR: [
                 // Courses for all grades
                 { grade: "الكل" },
-                // Courses matching student's grade and division
-                {
-                    AND: [
-                        { grade: user.grade },
-                        {
-                            divisions: {
-                                has: user.division
-                            }
-                        }
-                    ]
-                }
+                // Courses matching student's grade
+                { grade: user.grade }
             ]
         };
 
-        // Build AND clause to combine isPublished, title (if exists), and grade/division filter
+        // Build AND clause to combine isPublished, title (if exists), and grade filter
         const andConditions: any[] = [
             { isPublished: true },
-            gradeDivisionFilter
+            gradeFilter
         ];
 
         if (title) {
@@ -365,8 +356,8 @@ export default async function SearchPage({
                             <p className="text-muted-foreground mb-6">
                                 {title 
                                     ? "جرب البحث بكلمات مختلفة أو تصفح جميع الكورسات"
-                                    : user && user.role === "USER" && user.grade && user.division
-                                        ? `لا توجد كورسات متاحة للصف "${user.grade}" والقسم "${user.division}" حالياً`
+                                    : user && user.role === "USER" && user.grade
+                                        ? `لا توجد كورسات متاحة للصف "${user.grade}" حالياً`
                                         : "سيتم إضافة كورسات جديدة قريباً"
                                 }
                             </p>
