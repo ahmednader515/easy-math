@@ -8,7 +8,6 @@ import Image from "next/image";
 import { Navbar } from "@/components/navbar";
 import { ScrollProgress } from "@/components/scroll-progress";
 import { useEffect, useState } from "react";
-import { RecaptchaGate } from "@/components/recaptcha-gate";
 import { useSession } from "next-auth/react";
 
 // Define types based on Prisma schema
@@ -96,7 +95,6 @@ export default function HomePage() {
   };
 
   return (
-    <RecaptchaGate>
       <div className="h-full w-full bg-background">
         <Navbar />
         <ScrollProgress />
@@ -558,6 +556,5 @@ export default function HomePage() {
         </div>
       </section>
       </div>
-    </RecaptchaGate>
   );
 } 

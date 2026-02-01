@@ -1,12 +1,13 @@
 /**
  * Database Migration Script (TypeScript)
  * 
- * This script migrates data from Aiven database to Prisma database
+ * This script migrates data from current database to new database
  * using Prisma Client for better type safety and relationship handling.
  * 
  * Usage:
- *   Set SOURCE_DATABASE_URL and TARGET_DATABASE_URL in .env
- *   Run: ts-node --project scripts/tsconfig.json scripts/migrate-db.ts
+ *   Set DATABASE_URL, DIRECT_DATABASE_URL, PRISMA_ACCELERATE_URL (current)
+ *   Set NEW_DATABASE_URL, NEW_DIRECT_DATABASE_URL, NEW_PRISMA_ACCELERATE_URL (new)
+ *   Run: npm run migrate:db:ts
  */
 
 import { PrismaClient } from '@prisma/client';
@@ -23,18 +24,21 @@ function createPrismaClient(databaseUrl: string): PrismaClient {
 }
 
 async function migrateData() {
-  const sourceUrl = process.env.SOURCE_DATABASE_URL;
-  const targetUrl = process.env.TARGET_DATABASE_URL || process.env.DATABASE_URL || process.env.DIRECT_DATABASE_URL;
+  // Source database (current) - use DIRECT_DATABASE_URL if available, otherwise DATABASE_URL
+  const sourceUrl = process.env.DIRECT_DATABASE_URL || process.env.DATABASE_URL;
+  
+  // Target database (new) - use NEW_DIRECT_DATABASE_URL if available, otherwise NEW_DATABASE_URL
+  const targetUrl = process.env.NEW_DIRECT_DATABASE_URL || process.env.NEW_DATABASE_URL;
 
   if (!sourceUrl) {
-    console.error('❌ Error: SOURCE_DATABASE_URL environment variable not found!');
-    console.error('Please set SOURCE_DATABASE_URL to your Aiven database connection string.');
+    console.error('❌ Error: DATABASE_URL or DIRECT_DATABASE_URL environment variable not found!');
+    console.error('Please set DATABASE_URL (or DIRECT_DATABASE_URL) to your current database connection string.');
     process.exit(1);
   }
 
   if (!targetUrl) {
-    console.error('❌ Error: TARGET_DATABASE_URL or DATABASE_URL environment variable not found!');
-    console.error('Please set TARGET_DATABASE_URL to your target Prisma database connection string.');
+    console.error('❌ Error: NEW_DATABASE_URL or NEW_DIRECT_DATABASE_URL environment variable not found!');
+    console.error('Please set NEW_DATABASE_URL (or NEW_DIRECT_DATABASE_URL) to your new database connection string.');
     process.exit(1);
   }
 
@@ -48,7 +52,7 @@ async function migrateData() {
 
   try {
     // Test connections
-    console.log('[Step 1/15] Testing database connections...');
+    console.log('[Step 1/17] Testing database connections...');
     await sourceClient.$connect();
     console.log('  ✓ Source database connected');
     await targetClient.$connect();
@@ -56,44 +60,67 @@ async function migrateData() {
     console.log('');
 
     // Verify target database schema is up to date
-    console.log('[Step 2/15] Verifying target database schema...');
-    try {
-      // Try to query a Course with all expected fields
-      await targetClient.course.findFirst({
-        select: {
-          id: true,
-          userId: true,
-          title: true,
-          description: true,
-          imageUrl: true,
-          price: true,
-          isPublished: true,
-          grade: true,
-          divisions: true,
-          createdAt: true,
-          updatedAt: true,
-        },
-      });
-      console.log('  ✓ Target database schema verified');
-    } catch (error: any) {
-      if (error.code === 'P2022' || error.message?.includes('does not exist')) {
-        console.log('');
-        console.log('  ❌ Error: Target database schema is not up to date!');
-        console.log('');
-        console.log('  Please run Prisma migrations on the target database first:');
-        console.log('    npx prisma migrate deploy');
-        console.log('');
-        console.log('  Or if developing locally:');
-        console.log('    npx prisma migrate dev');
-        console.log('');
-        throw new Error('Target database schema is not up to date. Please run Prisma migrations first.');
+    console.log('[Step 2/17] Verifying target database schema...');
+    const skipSchemaCheck = process.env.SKIP_SCHEMA_CHECK === 'true';
+    
+    if (skipSchemaCheck) {
+      console.log('  ⚠️  Skipping schema check (SKIP_SCHEMA_CHECK=true)');
+      console.log('');
+    } else {
+      try {
+        // Try to query a Course with all expected fields
+        await targetClient.course.findFirst({
+          select: {
+            id: true,
+            userId: true,
+            title: true,
+            description: true,
+            imageUrl: true,
+            price: true,
+            isPublished: true,
+            grade: true,
+            divisions: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        });
+        console.log('  ✓ Target database schema verified');
+      } catch (error: any) {
+        if (error.code === 'P2022' || error.message?.includes('does not exist') || error.code === '42P01') {
+          console.log('');
+          console.log('  ❌ Error: Target database schema is not up to date!');
+          console.log('');
+          console.log('  Please run Prisma migrations on the target database first.');
+          console.log('');
+          console.log('  EASIEST WAY: Use the setup script:');
+          console.log('    npm run setup:new-db');
+          console.log('');
+          console.log('  OR manually run migrations (PowerShell):');
+          console.log('    $env:DATABASE_URL="' + targetUrl + '"');
+          if (process.env.NEW_DIRECT_DATABASE_URL) {
+            console.log('    $env:DIRECT_DATABASE_URL="' + process.env.NEW_DIRECT_DATABASE_URL + '"');
+          }
+          console.log('    npx prisma migrate deploy');
+          console.log('');
+          console.log('  Or if developing locally:');
+          console.log('    $env:DATABASE_URL="' + targetUrl + '"');
+          if (process.env.NEW_DIRECT_DATABASE_URL) {
+            console.log('    $env:DIRECT_DATABASE_URL="' + process.env.NEW_DIRECT_DATABASE_URL + '"');
+          }
+          console.log('    npx prisma migrate dev');
+          console.log('');
+          console.log('  Alternatively, you can set SKIP_SCHEMA_CHECK=true to skip this check');
+          console.log('  (not recommended unless you are certain the schema is correct)');
+          console.log('');
+          throw new Error('Target database schema is not up to date. Please run Prisma migrations first.');
+        }
+        throw error;
       }
-      throw error;
     }
     console.log('');
 
     // Migrate Users (must be first due to foreign key dependencies)
-    console.log('[Step 3/15] Migrating Users...');
+    console.log('[Step 3/17] Migrating Users...');
     const users = await sourceClient.user.findMany({
       orderBy: { createdAt: 'asc' },
     });
@@ -115,7 +142,7 @@ async function migrateData() {
     console.log('');
 
     // Migrate Courses
-    console.log('[Step 4/15] Migrating Courses...');
+    console.log('[Step 4/17] Migrating Courses...');
     const courses = await sourceClient.course.findMany({
       orderBy: { createdAt: 'asc' },
     });
@@ -134,7 +161,7 @@ async function migrateData() {
     console.log('');
 
     // Migrate Chapters
-    console.log('[Step 5/15] Migrating Chapters...');
+    console.log('[Step 5/17] Migrating Chapters...');
     const chapters = await sourceClient.chapter.findMany({
       orderBy: { createdAt: 'asc' },
     });
@@ -153,7 +180,7 @@ async function migrateData() {
     console.log('');
 
     // Migrate Attachments
-    console.log('[Step 6/15] Migrating Attachments...');
+    console.log('[Step 6/17] Migrating Attachments...');
     const attachments = await sourceClient.attachment.findMany({
       orderBy: { createdAt: 'asc' },
     });
@@ -189,7 +216,7 @@ async function migrateData() {
     console.log('');
 
     // Migrate User Progress
-    console.log('[Step 7/15] Migrating User Progress...');
+    console.log('[Step 7/17] Migrating User Progress...');
     const userProgress = await sourceClient.userProgress.findMany({
       orderBy: { createdAt: 'asc' },
     });
@@ -213,7 +240,7 @@ async function migrateData() {
     console.log('');
 
     // Migrate Purchases
-    console.log('[Step 8/14] Migrating Purchases...');
+    console.log('[Step 8/16] Migrating Purchases...');
     const purchases = await sourceClient.purchase.findMany({
       orderBy: { createdAt: 'asc' },
     });
@@ -237,7 +264,7 @@ async function migrateData() {
     console.log('');
 
     // Migrate Balance Transactions
-    console.log('[Step 9/14] Migrating Balance Transactions...');
+    console.log('[Step 9/16] Migrating Balance Transactions...');
     const transactions = await sourceClient.balanceTransaction.findMany({
       orderBy: { createdAt: 'asc' },
     });
@@ -256,7 +283,7 @@ async function migrateData() {
     console.log('');
 
     // Migrate Quizzes
-    console.log('[Step 10/14] Migrating Quizzes...');
+    console.log('[Step 10/16] Migrating Quizzes...');
     const quizzes = await sourceClient.quiz.findMany({
       orderBy: { createdAt: 'asc' },
     });
@@ -275,7 +302,7 @@ async function migrateData() {
     console.log('');
 
     // Migrate Questions
-    console.log('[Step 11/14] Migrating Questions...');
+    console.log('[Step 11/16] Migrating Questions...');
     const questions = await sourceClient.question.findMany({
       orderBy: { createdAt: 'asc' },
     });
@@ -294,7 +321,7 @@ async function migrateData() {
     console.log('');
 
     // Migrate Quiz Results
-    console.log('[Step 12/14] Migrating Quiz Results...');
+    console.log('[Step 12/16] Migrating Quiz Results...');
     const quizResults = await sourceClient.quizResult.findMany({
       orderBy: { createdAt: 'asc' },
     });
@@ -313,7 +340,7 @@ async function migrateData() {
     console.log('');
 
     // Migrate Quiz Attempts
-    console.log('[Step 13/14] Migrating Quiz Attempts...');
+    console.log('[Step 13/16] Migrating Quiz Attempts...');
     const quizAttempts = await sourceClient.quizAttempt.findMany({
       orderBy: { startedAt: 'asc' },
     });
@@ -337,7 +364,7 @@ async function migrateData() {
     console.log('');
 
     // Migrate Quiz Answers
-    console.log('[Step 14/14] Migrating Quiz Answers...');
+    console.log('[Step 14/16] Migrating Quiz Answers...');
     const quizAnswers = await sourceClient.quizAnswer.findMany({
       orderBy: { createdAt: 'asc' },
     });
@@ -356,7 +383,7 @@ async function migrateData() {
     console.log('');
 
     // Migrate Promo Codes
-    console.log('[Step 15/15] Migrating Promo Codes...');
+    console.log('[Step 15/16] Migrating Promo Codes...');
     const promoCodes = await sourceClient.promoCode.findMany({
       orderBy: { createdAt: 'asc' },
     });
@@ -371,6 +398,49 @@ async function migrateData() {
         });
       }
       console.log(`  ✓ Migrated ${promoCodes.length} promo codes`);
+    }
+    console.log('');
+
+    // Migrate Live Streams
+    console.log('[Step 16/17] Migrating Live Streams...');
+    const liveStreams = await sourceClient.liveStream.findMany({
+      orderBy: { createdAt: 'asc' },
+    });
+    console.log(`  Found ${liveStreams.length} live streams`);
+    
+    if (liveStreams.length > 0) {
+      for (const liveStream of liveStreams) {
+        await targetClient.liveStream.upsert({
+          where: { id: liveStream.id },
+          update: liveStream,
+          create: liveStream,
+        });
+      }
+      console.log(`  ✓ Migrated ${liveStreams.length} live streams`);
+    }
+    console.log('');
+
+    // Migrate Live Stream Attendance
+    console.log('[Step 17/17] Migrating Live Stream Attendance...');
+    const liveStreamAttendance = await sourceClient.liveStreamAttendance.findMany({
+      orderBy: { clickedAt: 'asc' },
+    });
+    console.log(`  Found ${liveStreamAttendance.length} live stream attendance records`);
+    
+    if (liveStreamAttendance.length > 0) {
+      for (const attendance of liveStreamAttendance) {
+        await targetClient.liveStreamAttendance.upsert({
+          where: {
+            liveStreamId_studentId: {
+              liveStreamId: attendance.liveStreamId,
+              studentId: attendance.studentId,
+            },
+          },
+          update: attendance,
+          create: attendance,
+        });
+      }
+      console.log(`  ✓ Migrated ${liveStreamAttendance.length} live stream attendance records`);
     }
     console.log('');
 
