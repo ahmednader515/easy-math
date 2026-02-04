@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Eye, Edit, Search, EyeOff } from "lucide-react";
+import { Eye, Edit, Search, EyeOff, X } from "lucide-react";
 import { toast } from "sonner";
 
 interface User {
@@ -19,30 +19,93 @@ interface User {
 }
 
 const TeacherPasswordsPage = () => {
-    const [users, setUsers] = useState<User[]>([]);
+    const [staffUsers, setStaffUsers] = useState<User[]>([]);
+    const [studentUsers, setStudentUsers] = useState<User[]>([]);
     const [loading, setLoading] = useState(true);
+    const [loadingMore, setLoadingMore] = useState(false);
+    const [searchInput, setSearchInput] = useState("");
     const [searchTerm, setSearchTerm] = useState("");
+    const [isSearching, setIsSearching] = useState(false);
     const [selectedUser, setSelectedUser] = useState<User | null>(null);
     const [newPassword, setNewPassword] = useState("");
     const [showPassword, setShowPassword] = useState(false);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const [hasMore, setHasMore] = useState(false);
+    const [totalCount, setTotalCount] = useState(0);
 
     useEffect(() => {
-        fetchUsers();
+        fetchStaffUsers();
+        fetchStudents(true);
     }, []);
 
-    const fetchUsers = async () => {
+    // Fetch all staff users (admins and teachers) - no pagination
+    const fetchStaffUsers = async (search: string = "") => {
         try {
-            const response = await fetch("/api/teacher/users");
+            const url = search 
+                ? `/api/teacher/users?role=STAFF&search=${encodeURIComponent(search)}`
+                : "/api/teacher/users?role=STAFF";
+            const response = await fetch(url);
             if (response.ok) {
                 const data = await response.json();
-                setUsers(data);
+                const usersArray = Array.isArray(data) ? data : (data.users || []);
+                setStaffUsers(usersArray);
             }
         } catch (error) {
-            console.error("Error fetching users:", error);
+            console.error("Error fetching staff users:", error);
+        }
+    };
+
+    // Fetch students with pagination or search
+    const fetchStudents = async (reset: boolean = false, search: string = "") => {
+        try {
+            if (reset) {
+                setLoading(true);
+            } else {
+                setLoadingMore(true);
+            }
+
+            const skip = reset ? 0 : studentUsers.length;
+            const searchParam = search ? `&search=${encodeURIComponent(search)}` : "";
+            const response = await fetch(`/api/teacher/users?role=USER&skip=${skip}&take=25${searchParam}`);
+            
+            if (response.ok) {
+                const data = await response.json();
+                const usersArray = Array.isArray(data) ? data : (data.users || []);
+                if (reset) {
+                    setStudentUsers(usersArray);
+                } else {
+                    setStudentUsers(prev => [...prev, ...usersArray]);
+                }
+                setHasMore(data.hasMore || false);
+                setTotalCount(data.totalCount || usersArray.length);
+            }
+        } catch (error) {
+            console.error("Error fetching students:", error);
         } finally {
             setLoading(false);
+            setLoadingMore(false);
         }
+    };
+
+    const handleLoadMore = () => {
+        fetchStudents(false, searchTerm);
+    };
+
+    const handleSearch = () => {
+        if (searchInput.trim()) {
+            setSearchTerm(searchInput.trim());
+            setIsSearching(true);
+            fetchStaffUsers(searchInput.trim());
+            fetchStudents(true, searchInput.trim());
+        }
+    };
+
+    const handleClearSearch = () => {
+        setSearchInput("");
+        setSearchTerm("");
+        setIsSearching(false);
+        fetchStaffUsers();
+        fetchStudents(true);
     };
 
     const handlePasswordChange = async () => {
@@ -74,13 +137,9 @@ const TeacherPasswordsPage = () => {
         }
     };
 
-    const filteredUsers = users.filter(user =>
-        user.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.phoneNumber.includes(searchTerm)
-    );
-
-    const staffUsers = filteredUsers.filter(user => user.role === "ADMIN" || user.role === "TEACHER");
-    const studentUsers = filteredUsers.filter(user => user.role === "USER");
+    // Users are already filtered by server when searching
+    const filteredStaffUsers = staffUsers;
+    const filteredStudentUsers = studentUsers;
 
     if (loading) {
         return (
@@ -99,18 +158,45 @@ const TeacherPasswordsPage = () => {
             </div>
 
             {/* Staff Table (Admins and Teachers) */}
-            {staffUsers.length > 0 && (
+            {filteredStaffUsers.length > 0 && (
                 <Card>
                     <CardHeader>
-                        <CardTitle>المشرفين والمعلمين</CardTitle>
+                        <div className="flex items-center justify-between">
+                            <CardTitle>المشرفين والمعلمين</CardTitle>
+                            <span className="text-sm text-muted-foreground">
+                                إجمالي: {staffUsers.length} | معروض: {filteredStaffUsers.length}
+                            </span>
+                        </div>
                         <div className="flex items-center space-x-2">
                             <Search className="h-4 w-4 text-muted-foreground" />
                             <Input
                                 placeholder="البحث بالاسم أو رقم الهاتف..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
+                                value={searchInput}
+                                onChange={(e) => setSearchInput(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                        handleSearch();
+                                    }
+                                }}
                                 className="max-w-sm"
                             />
+                            <Button
+                                onClick={handleSearch}
+                                variant="default"
+                                size="sm"
+                            >
+                                بحث
+                            </Button>
+                            {isSearching && (
+                                <Button
+                                    onClick={handleClearSearch}
+                                    variant="outline"
+                                    size="sm"
+                                >
+                                    <X className="h-4 w-4" />
+                                    إلغاء
+                                </Button>
+                            )}
                         </div>
                     </CardHeader>
                     <CardContent>
@@ -124,7 +210,7 @@ const TeacherPasswordsPage = () => {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {staffUsers.map((user) => (
+                                {filteredStaffUsers.map((user) => (
                                     <TableRow key={user.id}>
                                         <TableCell className="font-medium">
                                             {user.fullName}
@@ -165,18 +251,47 @@ const TeacherPasswordsPage = () => {
             )}
 
             {/* Students Table */}
-            {studentUsers.length > 0 && (
+            {filteredStudentUsers.length > 0 && (
                 <Card>
                     <CardHeader>
-                        <CardTitle>قائمة الطلاب</CardTitle>
+                        <div className="flex items-center justify-between">
+                            <CardTitle>قائمة الطلاب</CardTitle>
+                            {totalCount > 0 && (
+                                <span className="text-sm text-muted-foreground">
+                                    إجمالي: {totalCount} | معروض: {filteredStudentUsers.length}
+                                </span>
+                            )}
+                        </div>
                         <div className="flex items-center space-x-2">
                             <Search className="h-4 w-4 text-muted-foreground" />
                             <Input
                                 placeholder="البحث بالاسم أو رقم الهاتف..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
+                                value={searchInput}
+                                onChange={(e) => setSearchInput(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                        handleSearch();
+                                    }
+                                }}
                                 className="max-w-sm"
                             />
+                            <Button
+                                onClick={handleSearch}
+                                variant="default"
+                                size="sm"
+                            >
+                                بحث
+                            </Button>
+                            {isSearching && (
+                                <Button
+                                    onClick={handleClearSearch}
+                                    variant="outline"
+                                    size="sm"
+                                >
+                                    <X className="h-4 w-4" />
+                                    إلغاء
+                                </Button>
+                            )}
                         </div>
                     </CardHeader>
                     <CardContent>
@@ -190,7 +305,7 @@ const TeacherPasswordsPage = () => {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {studentUsers.map((user) => (
+                                {filteredStudentUsers.map((user) => (
                                     <TableRow key={user.id}>
                                         <TableCell className="font-medium">
                                             {user.fullName}
@@ -218,11 +333,22 @@ const TeacherPasswordsPage = () => {
                                 ))}
                             </TableBody>
                         </Table>
+                        {hasMore && !isSearching && (
+                            <div className="flex justify-center mt-4">
+                                <Button
+                                    onClick={handleLoadMore}
+                                    disabled={loadingMore}
+                                    variant="outline"
+                                >
+                                    {loadingMore ? "جاري التحميل..." : "تحميل المزيد (25 مستخدم)"}
+                                </Button>
+                            </div>
+                        )}
                     </CardContent>
                 </Card>
             )}
 
-            {filteredUsers.length === 0 && !loading && (
+            {filteredStaffUsers.length === 0 && filteredStudentUsers.length === 0 && !loading && (
                 <Card>
                     <CardContent className="p-6">
                         <div className="text-center text-muted-foreground">

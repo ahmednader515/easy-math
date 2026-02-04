@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Search, Edit, Trash2 } from "lucide-react";
+import { Search, Edit, Trash2, X } from "lucide-react";
 import { format } from "date-fns";
 import { ar } from "date-fns/locale/ar";
 import { toast } from "sonner";
@@ -67,9 +67,13 @@ interface EditUserData {
 }
 
 const UsersPage = () => {
-    const [users, setUsers] = useState<User[]>([]);
+    const [staffUsers, setStaffUsers] = useState<User[]>([]);
+    const [studentUsers, setStudentUsers] = useState<User[]>([]);
     const [loading, setLoading] = useState(true);
+    const [loadingMore, setLoadingMore] = useState(false);
+    const [searchInput, setSearchInput] = useState("");
     const [searchTerm, setSearchTerm] = useState("");
+    const [isSearching, setIsSearching] = useState(false);
     const [editingUser, setEditingUser] = useState<User | null>(null);
     const [editData, setEditData] = useState<EditUserData>({
         fullName: "",
@@ -79,19 +83,63 @@ const UsersPage = () => {
     });
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
+    const [hasMore, setHasMore] = useState(false);
+    const [totalStudentCount, setTotalStudentCount] = useState(0);
 
     useEffect(() => {
-        fetchUsers();
+        fetchStaffUsers();
+        fetchStudents(true);
     }, []);
 
-    const fetchUsers = async () => {
+    // Fetch all staff users (admins and teachers) - no pagination
+    const fetchStaffUsers = async (search: string = "") => {
         try {
-            const response = await fetch("/api/teacher/users");
+            const url = search 
+                ? `/api/teacher/users?role=STAFF&search=${encodeURIComponent(search)}`
+                : "/api/teacher/users?role=STAFF";
+            const response = await fetch(url);
+            
             if (response.ok) {
                 const data = await response.json();
-                setUsers(data);
+                setStaffUsers(data.users);
             } else {
-                console.error("Error fetching users:", response.status, response.statusText);
+                console.error("Error fetching staff users:", response.status, response.statusText);
+                if (response.status === 403) {
+                    toast.error("ليس لديك صلاحية للوصول إلى هذه الصفحة");
+                } else {
+                    toast.error("حدث خطأ في تحميل المشرفين والمعلمين");
+                }
+            }
+        } catch (error) {
+            console.error("Error fetching staff users:", error);
+            toast.error("حدث خطأ في تحميل المشرفين والمعلمين");
+        }
+    };
+
+    // Fetch students with pagination or search
+    const fetchStudents = async (reset: boolean = false, search: string = "") => {
+        try {
+            if (reset) {
+                setLoading(true);
+            } else {
+                setLoadingMore(true);
+            }
+
+            const skip = reset ? 0 : studentUsers.length;
+            const searchParam = search ? `&search=${encodeURIComponent(search)}` : "";
+            const response = await fetch(`/api/teacher/users?role=USER&skip=${skip}&take=25${searchParam}`);
+            
+            if (response.ok) {
+                const data = await response.json();
+                if (reset) {
+                    setStudentUsers(data.users);
+                } else {
+                    setStudentUsers(prev => [...prev, ...data.users]);
+                }
+                setHasMore(data.hasMore);
+                setTotalStudentCount(data.totalCount);
+            } else {
+                console.error("Error fetching students:", response.status, response.statusText);
                 if (response.status === 403) {
                     toast.error("ليس لديك صلاحية للوصول إلى هذه الصفحة");
                 } else {
@@ -99,11 +147,33 @@ const UsersPage = () => {
                 }
             }
         } catch (error) {
-            console.error("Error fetching users:", error);
+            console.error("Error fetching students:", error);
             toast.error("حدث خطأ في تحميل الطلاب");
         } finally {
             setLoading(false);
+            setLoadingMore(false);
         }
+    };
+
+    const handleLoadMore = () => {
+        fetchStudents(false, searchTerm);
+    };
+
+    const handleSearch = () => {
+        if (searchInput.trim()) {
+            setSearchTerm(searchInput.trim());
+            setIsSearching(true);
+            fetchStaffUsers(searchInput.trim());
+            fetchStudents(true, searchInput.trim());
+        }
+    };
+
+    const handleClearSearch = () => {
+        setSearchInput("");
+        setSearchTerm("");
+        setIsSearching(false);
+        fetchStaffUsers();
+        fetchStudents(true);
     };
 
     const handleEditUser = (user: User) => {
@@ -134,7 +204,12 @@ const UsersPage = () => {
                 toast.success(`تم تحديث بيانات ${userType} بنجاح`);
                 setIsEditDialogOpen(false);
                 setEditingUser(null);
-                fetchUsers(); // Refresh the list
+                // Refresh based on user role
+                if (editingUser.role === "USER") {
+                    fetchStudents(true);
+                } else {
+                    fetchStaffUsers();
+                }
             } else {
                 const error = await response.text();
                 console.error("Error updating user:", response.status, error);
@@ -163,7 +238,13 @@ const UsersPage = () => {
 
             if (response.ok) {
                 toast.success("تم حذف المستخدم بنجاح");
-                fetchUsers(); // Refresh the list
+                // Find the deleted user to determine which list to refresh
+                const deletedUser = [...staffUsers, ...studentUsers].find(u => u.id === userId);
+                if (deletedUser?.role === "USER") {
+                    fetchStudents(true);
+                } else {
+                    fetchStaffUsers();
+                }
             } else {
                 const error = await response.text();
                 console.error("Error deleting user:", response.status, error);
@@ -183,14 +264,10 @@ const UsersPage = () => {
         }
     };
 
-    const filteredUsers = users.filter(user =>
-        user.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.phoneNumber.includes(searchTerm)
-    );
-
-    // Separate users by role
-    const studentUsers = filteredUsers.filter(user => user.role === "USER");
-    const staffUsers = filteredUsers.filter(user => user.role === "TEACHER" || user.role === "ADMIN");
+    // When searching, use the fetched results directly (already filtered by server)
+    // When not searching, show all loaded users
+    const filteredStaffUsers = staffUsers;
+    const filteredStudentUsers = studentUsers;
 
     const renderSignupDetails = (user: User) => (
         <div className="space-y-1 text-sm text-muted-foreground text-right">
@@ -214,11 +291,10 @@ const UsersPage = () => {
     );
 
     // Debug logging
-    console.log("All users:", users);
-    console.log("Filtered users:", filteredUsers);
-    console.log("Student users:", studentUsers);
     console.log("Staff users:", staffUsers);
-    console.log("Admin users:", filteredUsers.filter(user => user.role === "ADMIN"));
+    console.log("Student users:", studentUsers);
+    console.log("Filtered staff users:", filteredStaffUsers);
+    console.log("Filtered student users:", filteredStudentUsers);
 
     if (loading) {
         return (
@@ -237,18 +313,45 @@ const UsersPage = () => {
             </div>
 
             {/* Staff Table (Admins and Teachers) */}
-            {staffUsers.length > 0 && (
+            {filteredStaffUsers.length > 0 && (
                 <Card>
                     <CardHeader>
-                        <CardTitle>المشرفين والمعلمين</CardTitle>
+                        <div className="flex items-center justify-between">
+                            <CardTitle>المشرفين والمعلمين</CardTitle>
+                            <span className="text-sm text-muted-foreground">
+                                إجمالي: {staffUsers.length} | معروض: {filteredStaffUsers.length}
+                            </span>
+                        </div>
                         <div className="flex items-center space-x-2">
                             <Search className="h-4 w-4 text-muted-foreground" />
                             <Input
                                 placeholder="البحث بالاسم أو رقم الهاتف..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
+                                value={searchInput}
+                                onChange={(e) => setSearchInput(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                        handleSearch();
+                                    }
+                                }}
                                 className="max-w-sm"
                             />
+                            <Button
+                                onClick={handleSearch}
+                                variant="default"
+                                size="sm"
+                            >
+                                بحث
+                            </Button>
+                            {isSearching && (
+                                <Button
+                                    onClick={handleClearSearch}
+                                    variant="outline"
+                                    size="sm"
+                                >
+                                    <X className="h-4 w-4" />
+                                    إلغاء
+                                </Button>
+                            )}
                         </div>
                     </CardHeader>
                     <CardContent>
@@ -265,7 +368,7 @@ const UsersPage = () => {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {staffUsers.map((user) => (
+                                {filteredStaffUsers.map((user) => (
                                     <TableRow key={user.id}>
                                         <TableCell className="font-medium">
                                             {user.fullName}
@@ -419,18 +522,45 @@ const UsersPage = () => {
             )}
 
             {/* Students Table */}
-            {studentUsers.length > 0 && (
+            {filteredStudentUsers.length > 0 && (
                 <Card>
                     <CardHeader>
-                        <CardTitle>قائمة الطلاب</CardTitle>
+                        <div className="flex items-center justify-between">
+                            <CardTitle>قائمة الطلاب</CardTitle>
+                            <span className="text-sm text-muted-foreground">
+                                إجمالي: {totalStudentCount} | معروض: {filteredStudentUsers.length}
+                            </span>
+                        </div>
                         <div className="flex items-center space-x-2">
                             <Search className="h-4 w-4 text-muted-foreground" />
                             <Input
                                 placeholder="البحث بالاسم أو رقم الهاتف..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
+                                value={searchInput}
+                                onChange={(e) => setSearchInput(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                        handleSearch();
+                                    }
+                                }}
                                 className="max-w-sm"
                             />
+                            <Button
+                                onClick={handleSearch}
+                                variant="default"
+                                size="sm"
+                            >
+                                بحث
+                            </Button>
+                            {isSearching && (
+                                <Button
+                                    onClick={handleClearSearch}
+                                    variant="outline"
+                                    size="sm"
+                                >
+                                    <X className="h-4 w-4" />
+                                    إلغاء
+                                </Button>
+                            )}
                         </div>
                     </CardHeader>
                     <CardContent>
@@ -449,7 +579,7 @@ const UsersPage = () => {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {studentUsers.map((user) => (
+                                {filteredStudentUsers.map((user) => (
                                     <TableRow key={user.id}>
                                         <TableCell className="font-medium">
                                             {user.fullName}
@@ -603,11 +733,22 @@ const UsersPage = () => {
                                 ))}
                             </TableBody>
                         </Table>
+                        {hasMore && !isSearching && (
+                            <div className="flex justify-center mt-4">
+                                <Button
+                                    onClick={handleLoadMore}
+                                    disabled={loadingMore}
+                                    variant="outline"
+                                >
+                                    {loadingMore ? "جاري التحميل..." : "تحميل المزيد (25 مستخدم)"}
+                                </Button>
+                            </div>
+                        )}
                     </CardContent>
                 </Card>
             )}
 
-            {staffUsers.length === 0 && studentUsers.length === 0 && !loading && (
+            {filteredStaffUsers.length === 0 && filteredStudentUsers.length === 0 && !loading && (
                 <Card>
                     <CardContent className="p-6">
                         <div className="text-center text-muted-foreground">

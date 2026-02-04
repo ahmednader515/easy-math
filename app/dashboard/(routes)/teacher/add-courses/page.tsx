@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, BookOpen, User, Plus } from "lucide-react";
+import { Search, BookOpen, User, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 
 interface User {
@@ -33,16 +33,21 @@ const TeacherAddCoursesPage = () => {
     const [courses, setCourses] = useState<Course[]>([]);
     const [ownedCourses, setOwnedCourses] = useState<Course[]>([]);
     const [loading, setLoading] = useState(true);
+    const [loadingMore, setLoadingMore] = useState(false);
+    const [searchInput, setSearchInput] = useState("");
     const [searchTerm, setSearchTerm] = useState("");
+    const [isSearching, setIsSearching] = useState(false);
     const [selectedUser, setSelectedUser] = useState<User | null>(null);
     const [selectedCourse, setSelectedCourse] = useState<string>("");
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [dialogMode, setDialogMode] = useState<"add" | "delete">("add");
     const [isAddingCourse, setIsAddingCourse] = useState(false);
     const [isDeletingCourse, setIsDeletingCourse] = useState(false);
+    const [hasMore, setHasMore] = useState(false);
+    const [totalCount, setTotalCount] = useState(0);
 
     useEffect(() => {
-        fetchUsers();
+        fetchUsers(true);
         fetchCourses();
     }, []);
 
@@ -66,20 +71,56 @@ const TeacherAddCoursesPage = () => {
         fetchOwned();
     }, [selectedUser]);
 
-    const fetchUsers = async () => {
+    const fetchUsers = async (reset: boolean = false, search: string = "") => {
         try {
-            const response = await fetch("/api/teacher/users");
+            if (reset) {
+                setLoading(true);
+            } else {
+                setLoadingMore(true);
+            }
+
+            const skip = reset ? 0 : users.length;
+            const searchParam = search ? `&search=${encodeURIComponent(search)}` : "";
+            const response = await fetch(`/api/teacher/users?role=USER&skip=${skip}&take=25${searchParam}`);
+            
             if (response.ok) {
                 const data = await response.json();
-                // Filter only students
-                const studentUsers = data.filter((user: User) => user.role === "USER");
-                setUsers(studentUsers);
+                const usersArray = Array.isArray(data) ? data : (data.users || []);
+                // Filter only students (should already be filtered by API, but keep for safety)
+                const studentUsers = usersArray.filter((user: User) => user.role === "USER");
+                if (reset) {
+                    setUsers(studentUsers);
+                } else {
+                    setUsers(prev => [...prev, ...studentUsers]);
+                }
+                setHasMore(data.hasMore || false);
+                setTotalCount(data.totalCount || studentUsers.length);
             }
         } catch (error) {
             console.error("Error fetching users:", error);
         } finally {
             setLoading(false);
+            setLoadingMore(false);
         }
+    };
+
+    const handleLoadMore = () => {
+        fetchUsers(false, searchTerm);
+    };
+
+    const handleSearch = () => {
+        if (searchInput.trim()) {
+            setSearchTerm(searchInput.trim());
+            setIsSearching(true);
+            fetchUsers(true, searchInput.trim());
+        }
+    };
+
+    const handleClearSearch = () => {
+        setSearchInput("");
+        setSearchTerm("");
+        setIsSearching(false);
+        fetchUsers(true);
     };
 
     const fetchCourses = async () => {
@@ -117,7 +158,7 @@ const TeacherAddCoursesPage = () => {
                 setIsDialogOpen(false);
                 setSelectedUser(null);
                 setSelectedCourse("");
-                fetchUsers(); // Refresh the list
+                fetchUsers(true); // Refresh the list from beginning
             } else {
                 const error = await response.json();
                 toast.error(error.message || "حدث خطأ أثناء إضافة الكورس");
@@ -148,7 +189,7 @@ const TeacherAddCoursesPage = () => {
                 setIsDialogOpen(false);
                 setSelectedCourse("");
                 setSelectedUser(null);
-                fetchUsers();
+                fetchUsers(true);
             } else {
                 const data = await res.json().catch(() => ({} as any));
                 toast.error((data as any).error || "حدث خطأ أثناء حذف الكورس");
@@ -161,10 +202,8 @@ const TeacherAddCoursesPage = () => {
         }
     };
 
-    const filteredUsers = users.filter(user =>
-        user.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.phoneNumber.includes(searchTerm)
-    );
+    // Users are already filtered by server when searching
+    const filteredUsers = users;
 
     if (loading) {
         return (
@@ -184,15 +223,44 @@ const TeacherAddCoursesPage = () => {
 
             <Card>
                 <CardHeader>
-                    <CardTitle>قائمة الطلاب</CardTitle>
+                    <div className="flex items-center justify-between">
+                        <CardTitle>قائمة الطلاب</CardTitle>
+                        {totalCount > 0 && (
+                            <span className="text-sm text-muted-foreground">
+                                إجمالي: {totalCount} | معروض: {filteredUsers.length}
+                            </span>
+                        )}
+                    </div>
                     <div className="flex items-center space-x-2">
                         <Search className="h-4 w-4 text-muted-foreground" />
                         <Input
                             placeholder="البحث بالاسم أو رقم الهاتف..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
+                            value={searchInput}
+                            onChange={(e) => setSearchInput(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                    handleSearch();
+                                }
+                            }}
                             className="max-w-sm"
                         />
+                        <Button
+                            onClick={handleSearch}
+                            variant="default"
+                            size="sm"
+                        >
+                            بحث
+                        </Button>
+                        {isSearching && (
+                            <Button
+                                onClick={handleClearSearch}
+                                variant="outline"
+                                size="sm"
+                            >
+                                <X className="h-4 w-4" />
+                                إلغاء
+                            </Button>
+                        )}
                     </div>
                 </CardHeader>
                 <CardContent>
@@ -254,6 +322,17 @@ const TeacherAddCoursesPage = () => {
                             ))}
                         </TableBody>
                     </Table>
+                    {hasMore && !isSearching && (
+                        <div className="flex justify-center mt-4">
+                            <Button
+                                onClick={handleLoadMore}
+                                disabled={loadingMore}
+                                variant="outline"
+                            >
+                                {loadingMore ? "جاري التحميل..." : "تحميل المزيد (25 مستخدم)"}
+                            </Button>
+                        </div>
+                    )}
                 </CardContent>
             </Card>
 

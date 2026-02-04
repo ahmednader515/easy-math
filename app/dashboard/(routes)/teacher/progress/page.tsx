@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
-import { Search, Eye, BookOpen, CheckCircle, Clock } from "lucide-react";
+import { Search, Eye, BookOpen, CheckCircle, Clock, X } from "lucide-react";
 import { format } from "date-fns";
 import { ar } from "date-fns/locale/ar";
 
@@ -61,30 +61,71 @@ interface Purchase {
 const ProgressPage = () => {
     const [users, setUsers] = useState<User[]>([]);
     const [loading, setLoading] = useState(true);
+    const [loadingMore, setLoadingMore] = useState(false);
+    const [searchInput, setSearchInput] = useState("");
     const [searchTerm, setSearchTerm] = useState("");
+    const [isSearching, setIsSearching] = useState(false);
     const [selectedUser, setSelectedUser] = useState<User | null>(null);
     const [userProgress, setUserProgress] = useState<UserProgress[]>([]);
     const [userPurchases, setUserPurchases] = useState<Purchase[]>([]);
     const [allChapters, setAllChapters] = useState<Chapter[]>([]);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [loadingProgress, setLoadingProgress] = useState(false);
+    const [hasMore, setHasMore] = useState(false);
+    const [totalCount, setTotalCount] = useState(0);
 
     useEffect(() => {
-        fetchUsers();
+        fetchUsers(true);
     }, []);
 
-    const fetchUsers = async () => {
+    const fetchUsers = async (reset: boolean = false, search: string = "") => {
         try {
-            const response = await fetch("/api/teacher/users");
+            if (reset) {
+                setLoading(true);
+            } else {
+                setLoadingMore(true);
+            }
+
+            const skip = reset ? 0 : users.length;
+            const searchParam = search ? `&search=${encodeURIComponent(search)}` : "";
+            const response = await fetch(`/api/teacher/users?role=USER&skip=${skip}&take=25${searchParam}`);
+            
             if (response.ok) {
                 const data = await response.json();
-                setUsers(data);
+                const usersArray = Array.isArray(data) ? data : (data.users || []);
+                if (reset) {
+                    setUsers(usersArray);
+                } else {
+                    setUsers(prev => [...prev, ...usersArray]);
+                }
+                setHasMore(data.hasMore || false);
+                setTotalCount(data.totalCount || usersArray.length);
             }
         } catch (error) {
             console.error("Error fetching users:", error);
         } finally {
             setLoading(false);
+            setLoadingMore(false);
         }
+    };
+
+    const handleLoadMore = () => {
+        fetchUsers(false, searchTerm);
+    };
+
+    const handleSearch = () => {
+        if (searchInput.trim()) {
+            setSearchTerm(searchInput.trim());
+            setIsSearching(true);
+            fetchUsers(true, searchInput.trim());
+        }
+    };
+
+    const handleClearSearch = () => {
+        setSearchInput("");
+        setSearchTerm("");
+        setIsSearching(false);
+        fetchUsers(true);
     };
 
     const fetchUserProgress = async (userId: string) => {
@@ -110,12 +151,8 @@ const ProgressPage = () => {
         setIsDialogOpen(true);
     };
 
-    const filteredUsers = users.filter(user =>
-        user.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.phoneNumber.includes(searchTerm)
-    );
-
-    const studentUsers = filteredUsers.filter(user => user.role === "USER");
+    // Users are already filtered by server when searching
+    const studentUsers = users.filter(user => user.role === "USER");
 
     const completedProgress = userProgress.filter(p => p.isCompleted).length;
     const inProgressChapters = userProgress.filter(p => !p.isCompleted).length;
@@ -141,15 +178,44 @@ const ProgressPage = () => {
 
             <Card>
                 <CardHeader>
-                    <CardTitle>قائمة الطلاب</CardTitle>
+                    <div className="flex items-center justify-between">
+                        <CardTitle>قائمة الطلاب</CardTitle>
+                        {totalCount > 0 && (
+                            <span className="text-sm text-muted-foreground">
+                                إجمالي: {totalCount} | معروض: {studentUsers.length}
+                            </span>
+                        )}
+                    </div>
                     <div className="flex items-center space-x-2">
                         <Search className="h-4 w-4 text-muted-foreground" />
                         <Input
                             placeholder="البحث بالاسم أو رقم الهاتف..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
+                            value={searchInput}
+                            onChange={(e) => setSearchInput(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                    handleSearch();
+                                }
+                            }}
                             className="max-w-sm"
                         />
+                        <Button
+                            onClick={handleSearch}
+                            variant="default"
+                            size="sm"
+                        >
+                            بحث
+                        </Button>
+                        {isSearching && (
+                            <Button
+                                onClick={handleClearSearch}
+                                variant="outline"
+                                size="sm"
+                            >
+                                <X className="h-4 w-4" />
+                                إلغاء
+                            </Button>
+                        )}
                     </div>
                 </CardHeader>
                 <CardContent>
@@ -194,6 +260,17 @@ const ProgressPage = () => {
                             ))}
                         </TableBody>
                     </Table>
+                    {hasMore && !isSearching && (
+                        <div className="flex justify-center mt-4">
+                            <Button
+                                onClick={handleLoadMore}
+                                disabled={loadingMore}
+                                variant="outline"
+                            >
+                                {loadingMore ? "جاري التحميل..." : "تحميل المزيد (25 مستخدم)"}
+                            </Button>
+                        </div>
+                    )}
                 </CardContent>
             </Card>
 
