@@ -127,7 +127,7 @@ export const ChangeGradeDialog = ({ open, onOpenChange }: ChangeGradeDialogProps
                                 <SelectTrigger>
                                     <SelectValue placeholder="اختر الصف الدراسي" />
                                 </SelectTrigger>
-                                <SelectContent className="z-[102]">
+                                <SelectContent>
                                     <SelectItem value="الأول الثانوي">الأول الثانوي</SelectItem>
                                     <SelectItem value="الثاني الثانوي">الثاني الثانوي</SelectItem>
                                     <SelectItem value="الثالث الثانوي">الثالث الثانوي</SelectItem>
@@ -145,7 +145,7 @@ export const ChangeGradeDialog = ({ open, onOpenChange }: ChangeGradeDialogProps
                                     <SelectTrigger>
                                         <SelectValue placeholder="اختر القسم" />
                                     </SelectTrigger>
-                                    <SelectContent className="z-[102]">
+                                    <SelectContent>
                                         {divisionOptions.map((option) => (
                                             <SelectItem key={option.value} value={option.value}>
                                                 {option.label}

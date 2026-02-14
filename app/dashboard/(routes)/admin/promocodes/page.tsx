@@ -569,7 +569,7 @@ const AdminPromoCodesPage = () => {
                                 <SelectTrigger>
                                     <SelectValue placeholder="اختر الكورس" />
                                 </SelectTrigger>
-                                <SelectContent className="z-[102]">
+                                <SelectContent>
                                     {courses.map((course) => (
                                         <SelectItem key={course.id} value={course.id}>
                                             {course.title}
