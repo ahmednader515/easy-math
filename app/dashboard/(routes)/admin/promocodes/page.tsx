@@ -47,6 +47,7 @@ const AdminPromoCodesPage = () => {
     // Form state
     const [selectedCourseId, setSelectedCourseId] = useState("");
     const [numberOfCodes, setNumberOfCodes] = useState("");
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     useEffect(() => {
         fetchPromocodes();
@@ -107,6 +108,7 @@ const AdminPromoCodesPage = () => {
             return;
         }
 
+        setIsSubmitting(true);
         try {
             const response = await fetch("/api/promocodes", {
                 method: "POST",
@@ -121,9 +123,10 @@ const AdminPromoCodesPage = () => {
 
             if (response.ok) {
                 toast.success(`تم إنشاء ${numCodes} كود بنجاح`);
-                setIsDialogOpen(false);
                 resetForm();
-                fetchPromocodes();
+                // Wait for codes to be created, then refresh and close dialog
+                await fetchPromocodes();
+                setIsDialogOpen(false);
             } else {
                 const errorData = await response.json();
                 toast.error(errorData.error || "حدث خطأ");
@@ -131,6 +134,8 @@ const AdminPromoCodesPage = () => {
         } catch (error) {
             console.error("Error creating promocodes:", error);
             toast.error("حدث خطأ أثناء إنشاء الأكواد");
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -141,6 +146,23 @@ const AdminPromoCodesPage = () => {
         } catch (error) {
             console.error("Error copying to clipboard:", error);
             toast.error("فشل نسخ الكود");
+        }
+    };
+
+    const handleCopySelected = async () => {
+        if (selectedIds.size === 0) {
+            toast.error("يرجى تحديد الأكواد المراد نسخها");
+            return;
+        }
+
+        try {
+            const selectedPromocodes = activePromocodes.filter(promo => selectedIds.has(promo.id));
+            const codes = selectedPromocodes.map(promo => promo.code).join('\n');
+            await navigator.clipboard.writeText(codes);
+            toast.success(`تم نسخ ${selectedIds.size} كود بنجاح`);
+        } catch (error) {
+            console.error("Error copying to clipboard:", error);
+            toast.error("فشل نسخ الأكواد");
         }
     };
 
@@ -283,13 +305,22 @@ const AdminPromoCodesPage = () => {
                 </h1>
                 <div className="flex gap-2">
                     {selectedIds.size > 0 && (
-                        <Button 
-                            variant="destructive" 
-                            onClick={openDeleteDialog}
-                        >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            حذف المحدد ({selectedIds.size})
-                        </Button>
+                        <>
+                            <Button 
+                                variant="outline" 
+                                onClick={handleCopySelected}
+                            >
+                                <Copy className="h-4 w-4 mr-2" />
+                                نسخ المحدد ({selectedIds.size})
+                            </Button>
+                            <Button 
+                                variant="destructive" 
+                                onClick={openDeleteDialog}
+                            >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                حذف المحدد ({selectedIds.size})
+                            </Button>
+                        </>
                     )}
                     <Button onClick={openCreateDialog} className="bg-[#0083d3] hover:bg-[#0083d3]/90">
                         <Plus className="h-4 w-4 mr-2" />
@@ -596,11 +627,19 @@ const AdminPromoCodesPage = () => {
                         </div>
 
                         <div className="flex justify-end gap-2 pt-4">
-                            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+                            <Button 
+                                variant="outline" 
+                                onClick={() => setIsDialogOpen(false)}
+                                disabled={isSubmitting}
+                            >
                                 إلغاء
                             </Button>
-                            <Button onClick={handleSubmit} className="bg-[#0083d3] hover:bg-[#0083d3]/90">
-                                إنشاء
+                            <Button 
+                                onClick={handleSubmit} 
+                                className="bg-[#0083d3] hover:bg-[#0083d3]/90"
+                                disabled={isSubmitting}
+                            >
+                                {isSubmitting ? "جاري الإنشاء..." : "إنشاء"}
                             </Button>
                         </div>
                     </div>
